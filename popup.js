@@ -25,6 +25,7 @@ const elements = {
   keepAllReviewTabs: document.querySelector("#keep-all-review-tabs"),
   status: document.querySelector("#status"),
   statusText: document.querySelector("#status-text"),
+  reportIssue: document.querySelector("#report-issue"),
 };
 
 const state = {
@@ -50,6 +51,7 @@ elements.sortByDomain.addEventListener("click", sortTabsByDomain);
 elements.domainGroupToggle.addEventListener("click", toggleDomainGroups);
 elements.gatherTabsHere.addEventListener("click", gatherTabsHere);
 elements.keepAllReviewTabs.addEventListener("click", keepAllReviewTabs);
+elements.reportIssue.addEventListener("click", openIssueTracker);
 
 initialize();
 
@@ -591,6 +593,12 @@ function formatTabUrl(tab) {
 function wait(milliseconds) {
   return new Promise((resolve) => {
     setTimeout(resolve, milliseconds);
+  });
+}
+
+function openIssueTracker() {
+  chrome.tabs.create({
+    url: "https://github.com/filipmares/tab-control/issues/new",
   });
 }
 
