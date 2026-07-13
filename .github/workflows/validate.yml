@@ -1,0 +1,47 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run logic tests
+        run: node --test tests/tab-logic.test.mjs
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check tab-logic.mjs
+          node --input-type=module --check < popup.js
+
+      - name: Validate manifest assets
+        run: |
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const manifest = JSON.parse(fs.readFileSync("manifest.json", "utf8"));
+          const assets = [
+            manifest.action.default_popup,
+            ...Object.values(manifest.icons),
+            ...Object.values(manifest.action.default_icon),
+          ];
+
+          for (const asset of assets) {
+            if (!fs.existsSync(asset)) {
+              throw new Error(`Missing manifest asset: ${asset}`);
+            }
+          }
+          NODE
