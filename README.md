@@ -30,7 +30,18 @@
   leaving pinned and grouped tabs untouched.
 - **Live feedback:** reports tab, duplicate, possible-match, and site counts.
 
-## Install locally
+## Install from a release
+
+1. Go to the [latest release](../../releases/latest) and download the
+   `tab-control-<version>.zip` asset.
+2. Extract the archive.
+3. Open `chrome://extensions`.
+4. Enable **Developer mode**.
+5. Select **Load unpacked**.
+6. Choose the extracted `tab-control-<version>` folder.
+7. Pin **Tab Control** from Chrome's extensions menu.
+
+## Install from source
 
 1. Download or clone this repository.
 2. Open `chrome://extensions`.
@@ -51,13 +62,17 @@ Tab groups require Chrome 89 or newer.
 All processing happens locally. Tab Control does not collect, store, or
 transmit browsing data. See [PRIVACY.md](PRIVACY.md).
 
-## Development
+## Development and releases
 
 No dependencies or build step are required.
 
 ```sh
 node --test tests/tab-logic.test.mjs
 ```
+
+Every push to `main` validates and packages the extension. When the
+`manifest.json` version has not already been released, the workflow tags that
+commit as `v<version>` and publishes the ZIP archive on GitHub Releases.
 
 ## Project structure
 
