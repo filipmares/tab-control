@@ -12,9 +12,9 @@
 
 <p align="center">
   <img
-    src="docs/tab-control-popup.png"
+    src="docs/popup-report-issue.png"
     width="340"
-    alt="Tab Control extension popup"
+    alt="Tab Control popup with tab tools and a Report an issue link"
   />
 </p>
 
