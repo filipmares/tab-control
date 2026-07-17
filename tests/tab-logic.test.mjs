@@ -8,6 +8,7 @@ import {
   getDuplicateTabIds,
   getGatherTabsPlan,
   getPartialDuplicateGroups,
+  getReviewTabIdsToClose,
   getSortedTabIds,
   getTabSummary,
 } from "../tab-logic.mjs";
@@ -65,6 +66,16 @@ test("uses pending URLs and keeps the leftmost copy by default", () => {
   ];
 
   assert.deepEqual(getDuplicateTabIds(tabs), [20]);
+});
+
+test("selects every reviewed tab when closing an entire match", () => {
+  const tabs = [
+    { id: 30, url: "https://example.com/one" },
+    { id: 31, url: "https://example.com/two" },
+  ];
+
+  assert.deepEqual(getReviewTabIdsToClose(tabs), [30, 31]);
+  assert.deepEqual(getReviewTabIdsToClose(tabs, 30), [31]);
 });
 
 test("sorts pinned and regular tabs separately by domain and title", () => {

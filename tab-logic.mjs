@@ -93,6 +93,14 @@ export function getDuplicateTabIds(tabs) {
   return duplicateIds;
 }
 
+export function getReviewTabIdsToClose(tabs, tabIdToKeep) {
+  return tabs
+    .filter(
+      (tab) => Number.isInteger(tab.id) && tab.id !== tabIdToKeep,
+    )
+    .map((tab) => tab.id);
+}
+
 export function getSortedTabIds(tabs) {
   const sortableTabs = tabs.filter((tab) => Number.isInteger(tab.id));
   const pinnedTabs = sortableTabs.filter((tab) => tab.pinned);
