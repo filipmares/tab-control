@@ -34,7 +34,7 @@
 
 1. Go to the [latest release](../../releases/latest) and download the
    `tab-control-<version>.zip` asset.
-2. Extract the archive.
+2. Create a `tab-control-<version>` folder and extract the archive into it.
 3. Open `chrome://extensions`.
 4. Enable **Developer mode**.
 5. Select **Load unpacked**.
@@ -72,7 +72,10 @@ node --test tests/tab-logic.test.mjs
 
 Every push to `main` validates and packages the extension. When the
 `manifest.json` version has not already been released, the workflow tags that
-commit as `v<version>` and publishes the ZIP archive on GitHub Releases.
+commit as `v<version>` and publishes the ZIP archive on GitHub Releases. The
+archive places `manifest.json` at its root, so the same package can be loaded
+unpacked or uploaded to the Chrome Web Store. Chrome only supports direct local
+CRX installation on Linux, so releases use the cross-platform ZIP format.
 
 ## Project structure
 
