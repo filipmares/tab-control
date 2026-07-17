@@ -66,15 +66,15 @@ jobs:
           cp manifest.json popup.html popup.css popup.js tab-logic.mjs "release/$extension"
           cp -R icons "release/$extension"
           (
-            cd release
-            zip -r "$extension.zip" "$extension"
+            cd "release/$extension"
+            zip -r "../$extension.zip" .
           )
 
       - name: Verify extension archive
         run: |
           archive="release/tab-control-${{ steps.version.outputs.value }}.zip"
           unzip -t "$archive"
-          unzip -Z1 "$archive" | grep -Fx "tab-control-${{ steps.version.outputs.value }}/manifest.json"
+          unzip -Z1 "$archive" | grep -Fx "manifest.json"
 
       - name: Upload extension archive
         uses: actions/upload-artifact@v7
