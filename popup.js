@@ -8,6 +8,10 @@ import {
   getSortedTabIds,
   getTabSummary,
 } from "./tab-logic.mjs";
+import {
+  createRecentlyClosedViewModel,
+  RECENT_SESSION_LIMIT,
+} from "./recent-logic.mjs";
 
 const elements = {
   actions: document.querySelector("#tab-actions"),
@@ -20,13 +24,22 @@ const elements = {
     "#domain-group-description",
   ),
   gatherTabsHere: document.querySelector("#gather-tabs-here"),
+  openRecentlyClosed: document.querySelector("#open-recently-closed"),
   review: document.querySelector("#duplicate-review"),
   reviewTabs: document.querySelector("#review-tabs"),
   reviewProgress: document.querySelector("#review-progress"),
   keepAllReviewTabs: document.querySelector("#keep-all-review-tabs"),
   closeAllReviewTabs: document.querySelector("#close-all-review-tabs"),
+  recentView: document.querySelector("#recent-view"),
+  recentBack: document.querySelector("#recent-back"),
+  recentRefresh: document.querySelector("#recent-refresh"),
+  recentList: document.querySelector("#recent-list"),
+  recentState: document.querySelector("#recent-state"),
+  recentStateTitle: document.querySelector("#recent-state-title"),
+  recentStateMessage: document.querySelector("#recent-state-message"),
   status: document.querySelector("#status"),
   statusText: document.querySelector("#status-text"),
+  actionHint: document.querySelector("#action-hint"),
   undoOffer: document.querySelector("#undo-offer"),
   undoText: document.querySelector("#undo-text"),
   undoCleanup: document.querySelector("#undo-cleanup"),
@@ -49,6 +62,10 @@ const state = {
   reviewIndex: 0,
   reviewExactClosedCount: 0,
   reviewClosedCount: 0,
+  view: "actions",
+  recentLoading: false,
+  recentRestoringId: null,
+  recentUnavailableIds: new Set(),
   undoTransaction: null,
 };
 
@@ -56,10 +73,14 @@ elements.closeDuplicates.addEventListener("click", closeDuplicateTabs);
 elements.sortByDomain.addEventListener("click", sortTabsByDomain);
 elements.domainGroupToggle.addEventListener("click", toggleDomainGroups);
 elements.gatherTabsHere.addEventListener("click", gatherTabsHere);
+elements.openRecentlyClosed.addEventListener("click", openRecentlyClosed);
 elements.keepAllReviewTabs.addEventListener("click", keepAllReviewTabs);
 elements.closeAllReviewTabs.addEventListener("click", closeAllReviewTabs);
+elements.recentBack.addEventListener("click", showActionsView);
+elements.recentRefresh.addEventListener("click", () => loadRecentlyClosed());
 elements.undoCleanup.addEventListener("click", undoDuplicateCleanup);
 elements.reportIssue.addEventListener("click", openIssueTracker);
+chrome.sessions?.onChanged?.addListener(refreshOpenRecentlyClosedView);
 
 initialize();
 
@@ -73,6 +94,208 @@ async function initialize() {
     setStatus(formatSummary(summary, state.partialGroupCount));
   } catch (error) {
     setStatus(`Could not read this window. ${getErrorMessage(error)}`, "error");
+  }
+}
+
+function openRecentlyClosed() {
+  if (state.busy || state.reviewing) {
+    return;
+  }
+
+  state.view = "recent";
+  elements.actions.hidden = true;
+  elements.recentView.hidden = false;
+  elements.status.hidden = true;
+  elements.actionHint.hidden = true;
+  elements.recentBack.focus();
+  loadRecentlyClosed();
+}
+
+async function showActionsView() {
+  state.view = "actions";
+  elements.recentView.hidden = true;
+  elements.actions.hidden = false;
+  elements.status.hidden = false;
+  elements.actionHint.hidden = false;
+  setBusy(true, "Checking this window…");
+
+  try {
+    const summary = await refreshSummary();
+    setStatus(formatSummary(summary, state.partialGroupCount));
+  } catch (error) {
+    setStatus(`Could not read this window. ${getErrorMessage(error)}`, "error");
+  } finally {
+    setBusy(false);
+    elements.openRecentlyClosed.focus();
+  }
+}
+
+async function loadRecentlyClosed(notice = null) {
+  state.recentLoading = true;
+  elements.recentView.setAttribute("aria-busy", "true");
+  elements.recentList.replaceChildren();
+  elements.recentList.hidden = true;
+  showRecentState(
+    "Loading recently closed items",
+    "Reading Chrome's browser-wide session history.",
+    "busy",
+  );
+  syncRecentControlStates();
+
+  if (typeof chrome.sessions?.getRecentlyClosed !== "function") {
+    state.recentLoading = false;
+    elements.recentView.removeAttribute("aria-busy");
+    showRecentState(
+      "Recently closed is unavailable",
+      "Reload Tab Control from chrome://extensions. This view requires Chrome's sessions permission.",
+      "unavailable",
+    );
+    syncRecentControlStates();
+    return;
+  }
+
+  try {
+    const sessions = await chrome.sessions.getRecentlyClosed({
+      maxResults: RECENT_SESSION_LIMIT,
+    });
+    const items = createRecentlyClosedViewModel(sessions).filter(
+      (item) => !state.recentUnavailableIds.has(item.sessionId),
+    );
+
+    renderRecentlyClosedItems(items);
+
+    if (items.length === 0) {
+      const message = notice?.tone === "success"
+        ? `${notice.message} Chrome's browser-wide list is now empty.`
+        : "Close a tab or window in Chrome, then refresh this view.";
+      showRecentState(
+        "Nothing recently closed",
+        message,
+        notice?.tone === "success" ? "success" : "neutral",
+      );
+    } else if (notice) {
+      showRecentState(notice.title, notice.message, notice.tone);
+    } else {
+      elements.recentState.hidden = true;
+    }
+  } catch (error) {
+    showRecentState(
+      "Recently closed is unavailable",
+      `Chrome could not provide its session history. ${getErrorMessage(error)}`,
+      "unavailable",
+    );
+  } finally {
+    state.recentLoading = false;
+    elements.recentView.removeAttribute("aria-busy");
+    syncRecentControlStates();
+  }
+}
+
+function renderRecentlyClosedItems(items) {
+  elements.recentList.replaceChildren();
+
+  for (const item of items) {
+    const entry = document.createElement("li");
+    const button = document.createElement("button");
+    const marker = document.createElement("span");
+    const copy = document.createElement("span");
+    const type = document.createElement("span");
+    const title = document.createElement("strong");
+    const context = document.createElement("span");
+    const restore = document.createElement("span");
+    const representativeTitles = item.representativeTitles.slice(1).join(" · ");
+
+    entry.className = "recent__entry";
+    button.type = "button";
+    button.className = `recent-item recent-item--${item.kind}`;
+    button.dataset.sessionId = item.sessionId;
+    button.setAttribute("aria-label", item.ariaLabel);
+    button.addEventListener("click", () => restoreRecentlyClosedItem(item));
+
+    marker.className = "recent-item__marker";
+    marker.textContent = item.kind === "window" ? "WIN" : "TAB";
+    marker.setAttribute("aria-hidden", "true");
+
+    copy.className = "recent-item__copy";
+    type.className = "recent-item__type";
+    type.textContent = item.kind === "window" ? "Window" : "Tab";
+    title.className = "recent-item__title";
+    title.textContent = item.title;
+    context.className = "recent-item__context";
+    context.textContent = item.kind === "window" && representativeTitles
+      ? `${item.context} · ${representativeTitles}`
+      : item.context;
+    restore.className = "recent-item__restore";
+    restore.textContent = "Restore";
+    restore.setAttribute("aria-hidden", "true");
+
+    copy.append(type, title, context);
+    button.append(marker, copy, restore);
+    entry.append(button);
+    elements.recentList.append(entry);
+  }
+
+  elements.recentList.hidden = items.length === 0;
+}
+
+async function restoreRecentlyClosedItem(item) {
+  if (state.recentLoading || state.recentRestoringId) {
+    return;
+  }
+
+  state.recentRestoringId = item.sessionId;
+  showRecentState(
+    `Restoring ${item.kind}`,
+    "Using Chrome's normal session restore behavior.",
+    "busy",
+  );
+  syncRecentControlStates();
+
+  try {
+    await chrome.sessions.restore(item.sessionId);
+    state.recentUnavailableIds.add(item.sessionId);
+    await loadRecentlyClosed({
+      title: `${item.kind === "window" ? "Window" : "Tab"} restored`,
+      message: "Chrome restored the item and refreshed this browser-wide list.",
+      tone: "success",
+    });
+  } catch (error) {
+    state.recentUnavailableIds.add(item.sessionId);
+    await loadRecentlyClosed({
+      title: `Could not restore ${item.kind}`,
+      message: `${getErrorMessage(error)} The item may no longer be available; Chrome's list was refreshed.`,
+      tone: "error",
+    });
+  } finally {
+    state.recentRestoringId = null;
+    syncRecentControlStates();
+  }
+}
+
+function refreshOpenRecentlyClosedView() {
+  if (
+    state.view === "recent" &&
+    !state.recentLoading &&
+    !state.recentRestoringId
+  ) {
+    loadRecentlyClosed();
+  }
+}
+
+function showRecentState(title, message, tone = "neutral") {
+  elements.recentStateTitle.textContent = title;
+  elements.recentStateMessage.textContent = message;
+  elements.recentState.dataset.tone = tone;
+  elements.recentState.hidden = false;
+}
+
+function syncRecentControlStates() {
+  const unavailable =
+    state.recentLoading || Boolean(state.recentRestoringId);
+  elements.recentRefresh.disabled = unavailable;
+
+  for (const button of elements.recentList.querySelectorAll("button")) {
+    button.disabled = unavailable;
   }
 }
 
@@ -673,6 +896,7 @@ function syncButtonStates() {
     : "Group sites with two or more tabs";
   elements.gatherTabsHere.disabled =
     actionsUnavailable || state.gatherableTabCount === 0;
+  elements.openRecentlyClosed.disabled = actionsUnavailable;
 }
 
 function syncReviewControlStates() {
