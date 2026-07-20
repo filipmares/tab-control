@@ -4,6 +4,7 @@ import {
   getDuplicateTabIds,
   getGatherTabsPlan,
   getPartialDuplicateGroups,
+  getReviewTabIdsToClose,
   getSortedTabIds,
   getTabSummary,
 } from "./tab-logic.mjs";
@@ -23,6 +24,7 @@ const elements = {
   reviewTabs: document.querySelector("#review-tabs"),
   reviewProgress: document.querySelector("#review-progress"),
   keepAllReviewTabs: document.querySelector("#keep-all-review-tabs"),
+  closeAllReviewTabs: document.querySelector("#close-all-review-tabs"),
   status: document.querySelector("#status"),
   statusText: document.querySelector("#status-text"),
   reportIssue: document.querySelector("#report-issue"),
@@ -51,6 +53,7 @@ elements.sortByDomain.addEventListener("click", sortTabsByDomain);
 elements.domainGroupToggle.addEventListener("click", toggleDomainGroups);
 elements.gatherTabsHere.addEventListener("click", gatherTabsHere);
 elements.keepAllReviewTabs.addEventListener("click", keepAllReviewTabs);
+elements.closeAllReviewTabs.addEventListener("click", closeAllReviewTabs);
 elements.reportIssue.addEventListener("click", openIssueTracker);
 
 initialize();
@@ -131,6 +134,8 @@ function renderReviewGroup() {
   elements.reviewTabs.replaceChildren();
   elements.keepAllReviewTabs.textContent =
     group.length === 2 ? "Keep both tabs" : "Keep all tabs in this match";
+  elements.closeAllReviewTabs.textContent =
+    group.length === 2 ? "Close both tabs" : "Close all tabs in this match";
 
   for (const tab of group) {
     const button = document.createElement("button");
@@ -183,9 +188,7 @@ async function keepOnlyReviewTab(tabId) {
   }
 
   const group = state.reviewGroups[state.reviewIndex];
-  const tabIdsToClose = group
-    .filter((tab) => tab.id !== tabId)
-    .map((tab) => tab.id);
+  const tabIdsToClose = getReviewTabIdsToClose(group, tabId);
 
   setBusy(true, "Applying your duplicate choice…");
 
@@ -214,6 +217,30 @@ async function keepAllReviewTabs() {
     await advanceReview();
   } catch (error) {
     setStatus(`Could not continue the review. ${getErrorMessage(error)}`, "error");
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function closeAllReviewTabs() {
+  if (state.busy) {
+    return;
+  }
+
+  const group = state.reviewGroups[state.reviewIndex];
+  const tabIdsToClose = getReviewTabIdsToClose(group);
+
+  setBusy(true, "Closing these tabs…");
+
+  try {
+    if (tabIdsToClose.length > 0) {
+      await chrome.tabs.remove(tabIdsToClose);
+      state.reviewClosedCount += tabIdsToClose.length;
+    }
+
+    await advanceReview();
+  } catch (error) {
+    setStatus(`Could not close these tabs. ${getErrorMessage(error)}`, "error");
   } finally {
     setBusy(false);
   }
@@ -528,6 +555,7 @@ function syncButtonStates() {
 
 function syncReviewControlStates() {
   elements.keepAllReviewTabs.disabled = state.busy;
+  elements.closeAllReviewTabs.disabled = state.busy;
 
   for (const button of elements.reviewTabs.querySelectorAll("button")) {
     button.disabled = state.busy;

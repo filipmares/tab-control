@@ -82,14 +82,27 @@
         <div class="review__header">
           <div>
             <p>Possible duplicate</p>
-            <h2 id="review-title">Choose one tab to keep</h2>
+            <h2 id="review-title">Choose what to keep</h2>
           </div>
           <span id="review-progress">1 / 1</span>
         </div>
         <div class="review__tabs" id="review-tabs"></div>
-        <button class="review__keep-all" id="keep-all-review-tabs" type="button">
-          Keep all tabs in this match
-        </button>
+        <div class="review__controls">
+          <button
+            class="review__keep-all"
+            id="keep-all-review-tabs"
+            type="button"
+          >
+            Keep all tabs in this match
+          </button>
+          <button
+            class="review__close-all"
+            id="close-all-review-tabs"
+            type="button"
+          >
+            Close all tabs in this match
+          </button>
+        </div>
       </section>
 
       <div class="status" id="status" role="status" aria-live="polite">
