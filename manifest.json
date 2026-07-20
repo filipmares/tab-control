@@ -2,9 +2,14 @@
   "manifest_version": 3,
   "name": "Tab Control",
   "description": "Control the clutter by cleaning and organizing tabs across Chrome windows.",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "minimum_chrome_version": "102",
-  "permissions": ["tabs", "tabGroups", "sessions", "storage"],
+  "permissions": [
+    "tabs",
+    "tabGroups",
+    "sessions",
+    "storage"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"
