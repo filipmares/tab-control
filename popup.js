@@ -40,6 +40,9 @@ const elements = {
   status: document.querySelector("#status"),
   statusText: document.querySelector("#status-text"),
   actionHint: document.querySelector("#action-hint"),
+  undoOffer: document.querySelector("#undo-offer"),
+  undoText: document.querySelector("#undo-text"),
+  undoCleanup: document.querySelector("#undo-cleanup"),
   reportIssue: document.querySelector("#report-issue"),
 };
 
@@ -63,6 +66,7 @@ const state = {
   recentLoading: false,
   recentRestoringId: null,
   recentUnavailableIds: new Set(),
+  undoTransaction: null,
 };
 
 elements.closeDuplicates.addEventListener("click", closeDuplicateTabs);
@@ -74,6 +78,7 @@ elements.keepAllReviewTabs.addEventListener("click", keepAllReviewTabs);
 elements.closeAllReviewTabs.addEventListener("click", closeAllReviewTabs);
 elements.recentBack.addEventListener("click", showActionsView);
 elements.recentRefresh.addEventListener("click", () => loadRecentlyClosed());
+elements.undoCleanup.addEventListener("click", undoDuplicateCleanup);
 elements.reportIssue.addEventListener("click", openIssueTracker);
 chrome.sessions?.onChanged?.addListener(refreshOpenRecentlyClosedView);
 
@@ -81,7 +86,11 @@ initialize();
 
 async function initialize() {
   try {
-    const summary = await refreshSummary();
+    const [summary, undoTransaction] = await Promise.all([
+      refreshSummary(),
+      getUndoTransaction(),
+    ]);
+    updateUndoTransaction(undoTransaction);
     setStatus(formatSummary(summary, state.partialGroupCount));
   } catch (error) {
     setStatus(`Could not read this window. ${getErrorMessage(error)}`, "error");
@@ -299,17 +308,30 @@ async function closeDuplicateTabs() {
 
   try {
     const tabs = await queryCurrentWindowTabs();
-    const duplicateIds = getDuplicateTabIds(tabs);
+    const currentWindow = await chrome.windows.getCurrent();
+    const startedTransaction = await sendBackgroundMessage({
+      type: "BEGIN_DUPLICATE_CLEANUP",
+      windowId: currentWindow.id,
+    });
+    updateUndoTransaction(startedTransaction.transaction);
 
-    if (duplicateIds.length > 0) {
-      await chrome.tabs.remove(duplicateIds);
+    const duplicateIds = getDuplicateTabIds(tabs);
+    const duplicateTabs = getTabsByIds(tabs, duplicateIds);
+    let closeResult = {
+      transaction: startedTransaction.transaction,
+      closedNow: 0,
+      failed: 0,
+    };
+
+    if (duplicateTabs.length > 0) {
+      closeResult = await closeTabsForCleanup(duplicateTabs);
     }
 
     const remainingTabs = await queryCurrentWindowTabs();
     const partialGroups = updateSummaryFromTabs(remainingTabs);
 
     if (partialGroups.length > 0) {
-      startPartialReview(partialGroups, duplicateIds.length);
+      startPartialReview(partialGroups, closeResult.closedNow);
       return;
     }
 
@@ -318,10 +340,16 @@ async function closeDuplicateTabs() {
       return;
     }
 
-    setStatus(
-      `Closed ${duplicateIds.length} exact duplicate ${pluralize("tab", duplicateIds.length)}.`,
-      "success",
-    );
+    if (closeResult.closedNow === 0) {
+      setStatus("Could not close the exact duplicate tabs.", "error");
+    } else if (closeResult.failed > 0) {
+      setStatus(
+        `${closeResult.failed} exact ${pluralize("duplicate", closeResult.failed)} could not be closed.`,
+        "error",
+      );
+    } else {
+      setStatus("Duplicate cleanup complete.", "success");
+    }
   } catch (error) {
     setStatus(`Could not close duplicates. ${getErrorMessage(error)}`, "error");
   } finally {
@@ -341,12 +369,8 @@ function startPartialReview(groups, exactClosedCount) {
   renderReviewGroup();
   syncButtonStates();
 
-  const prefix =
-    exactClosedCount > 0
-      ? `Closed ${exactClosedCount} exact ${pluralize("duplicate", exactClosedCount)}. `
-      : "";
   setStatus(
-    `${prefix}Review ${groups.length} possible ${pluralize("match", groups.length)}.`,
+    `Review ${groups.length} possible ${pluralize("match", groups.length)}.`,
   );
 }
 
@@ -417,8 +441,16 @@ async function keepOnlyReviewTab(tabId) {
 
   try {
     if (tabIdsToClose.length > 0) {
-      await chrome.tabs.remove(tabIdsToClose);
-      state.reviewClosedCount += tabIdsToClose.length;
+      const result = await closeTabsForCleanup(
+        getTabsByIds(group, tabIdsToClose),
+      );
+      state.reviewClosedCount += result.closedNow;
+
+      if (result.failed > 0) {
+        throw new Error(
+          `${result.failed} ${pluralize("tab", result.failed)} could not be closed.`,
+        );
+      }
     }
 
     await advanceReview();
@@ -457,8 +489,16 @@ async function closeAllReviewTabs() {
 
   try {
     if (tabIdsToClose.length > 0) {
-      await chrome.tabs.remove(tabIdsToClose);
-      state.reviewClosedCount += tabIdsToClose.length;
+      const result = await closeTabsForCleanup(
+        getTabsByIds(group, tabIdsToClose),
+      );
+      state.reviewClosedCount += result.closedNow;
+
+      if (result.failed > 0) {
+        throw new Error(
+          `${result.failed} ${pluralize("tab", result.failed)} could not be closed.`,
+        );
+      }
     }
 
     await advanceReview();
@@ -499,10 +539,7 @@ async function finishPartialReview() {
   await refreshSummary();
 
   if (totalClosed > 0) {
-    setStatus(
-      `Closed ${totalClosed} duplicate ${pluralize("tab", totalClosed)}.`,
-      "success",
-    );
+    setStatus("Duplicate cleanup complete.", "success");
   } else {
     setStatus(
       `Kept all tabs from ${reviewedCount} possible ${pluralize("match", reviewedCount)}.`,
@@ -707,6 +744,90 @@ function queryNormalWindows() {
   });
 }
 
+async function closeTabsForCleanup(tabs) {
+  if (!state.undoTransaction?.id) {
+    throw new Error("The duplicate cleanup transaction is unavailable.");
+  }
+
+  const result = await sendBackgroundMessage({
+    type: "CLOSE_CLEANUP_TABS",
+    transactionId: state.undoTransaction.id,
+    tabs,
+  });
+  updateUndoTransaction(result.transaction);
+  return result;
+}
+
+async function getUndoTransaction() {
+  const result = await sendBackgroundMessage({
+    type: "GET_DUPLICATE_CLEANUP_UNDO",
+  });
+  return result.transaction;
+}
+
+async function undoDuplicateCleanup() {
+  if (state.busy || !state.undoTransaction?.id) {
+    return;
+  }
+
+  const transactionId = state.undoTransaction.id;
+  setBusy(true, "Restoring closed tabs…");
+
+  try {
+    const result = await sendBackgroundMessage({
+      type: "RESTORE_DUPLICATE_CLEANUP",
+      transactionId,
+    });
+    updateUndoTransaction(result.transaction);
+    showRestorationOutcome(result.outcome);
+    await refreshSummary();
+  } catch (error) {
+    setStatus(
+      `Could not restore closed tabs. ${getErrorMessage(error)}`,
+      "error",
+    );
+  } finally {
+    setBusy(false);
+  }
+}
+
+function showRestorationOutcome(outcome) {
+  switch (outcome.status) {
+    case "restored":
+      setStatus(
+        `Restored ${outcome.restored} ${pluralize("tab", outcome.restored)}.`,
+        "success",
+      );
+      break;
+    case "partial":
+      setStatus(
+        `Restored ${outcome.restored} of ${outcome.total} tabs. ${outcome.failed} could not be restored.`,
+        "error",
+      );
+      break;
+    case "failed": {
+      const detail = outcome.error ? ` ${outcome.error}` : "";
+      setStatus(
+        `Could not restore ${outcome.total} closed ${pluralize("tab", outcome.total)}.${detail}`,
+        "error",
+      );
+      break;
+    }
+    default:
+      setStatus("Undo is no longer available.", "error");
+  }
+}
+
+function sendBackgroundMessage(message) {
+  return chrome.runtime.sendMessage(message).then((response) => {
+    if (!response?.ok) {
+      throw new Error(response?.error || "The extension did not respond.");
+    }
+
+    return response;
+  });
+}
+
 async function moveTabWithRetry(tabId, index) {
   await runWithTabEditRetry(() => chrome.tabs.move(tabId, { index }));
 }
@@ -736,6 +857,7 @@ function setBusy(busy, message) {
   document.body.toggleAttribute("aria-busy", busy);
   syncButtonStates();
   syncReviewControlStates();
+  syncUndoState();
 
   if (busy && message) {
     setStatus(message, "busy");
@@ -789,6 +911,33 @@ function syncReviewControlStates() {
 function setStatus(message, tone = "neutral") {
   elements.statusText.textContent = message;
   elements.status.dataset.tone = tone;
+}
+
+function updateUndoTransaction(transaction) {
+  state.undoTransaction = transaction;
+  syncUndoState();
+}
+
+function syncUndoState() {
+  const count = state.undoTransaction?.count || 0;
+  elements.undoOffer.hidden = count === 0;
+  elements.undoCleanup.disabled = state.busy;
+
+  if (count === 0) {
+    return;
+  }
+
+  elements.undoText.textContent =
+    `Closed ${count} ${pluralize("tab", count)}`;
+  elements.undoCleanup.setAttribute(
+    "aria-label",
+    `Undo the latest duplicate cleanup and restore ${count} ${pluralize("tab", count)}`,
+  );
+}
+
+function getTabsByIds(tabs, tabIds) {
+  const ids = new Set(tabIds);
+  return tabs.filter((tab) => ids.has(tab.id));
 }
 
 function arraysMatch(left, right) {

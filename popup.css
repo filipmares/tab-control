@@ -640,9 +640,6 @@ h1 {
 }
 
 .status {
-  display: flex;
-  align-items: center;
-  gap: 9px;
   min-height: 36px;
   margin: 11px 0 0;
   padding: 9px 11px;
@@ -654,6 +651,53 @@ h1 {
   font-size: 9.5px;
   letter-spacing: 0.01em;
   line-height: 1.4;
+}
+
+.status__message,
+.status__undo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.status__undo {
+  margin: 8px 0 0 15px;
+  padding: 7px 0 0;
+  border-top: 1px solid rgb(241 240 232 / 24%);
+  color: var(--display-text);
+}
+
+.status__undo[hidden] {
+  display: none;
+}
+
+.status__undo-button {
+  margin: -4px -3px -4px auto;
+  padding: 4px 3px;
+  color: #a8cfaf;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.status__undo-button:hover:not(:disabled) {
+  color: #d5ebd9;
+}
+
+.status__undo-button:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
+}
+
+.status__undo-button:disabled {
+  cursor: wait;
+  opacity: 0.55;
 }
 
 .status__dot {

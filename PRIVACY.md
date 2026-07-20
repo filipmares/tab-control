@@ -9,7 +9,13 @@ Tab Control does not:
 - collect or build a separate browsing history or personal profile;
 - transmit tab titles, addresses, or usage data;
 - use analytics or tracking services;
-- store tab information after an action completes.
+- keep a permanent or synced tab history.
+
+For the Undo feature, Tab Control keeps the addresses and positions of tabs
+closed by the latest duplicate cleanup in Chrome's in-memory session storage.
+This one transaction is replaced by the next cleanup, removed after Undo, and
+cleared when Chrome restarts, the extension reloads, or the extension is
+disabled.
 
 The Recently closed view reads up to 10 entries from Chrome's browser-wide
 recently closed session history while the popup is open. Those entries can
@@ -23,6 +29,8 @@ Chrome and are neither copied into a Tab Control history nor sent elsewhere.
   Chrome tab groups.
 - `sessions` allows the extension to read and restore Chrome's browser-wide
   recently closed tabs and windows.
+- `storage` keeps the latest duplicate cleanup available to Undo only for the
+  current browser session.
 
 Incognito windows remain separate and are only accessible if the user
 explicitly enables the extension in incognito mode. Cross-window gathering

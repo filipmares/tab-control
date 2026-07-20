@@ -21,7 +21,8 @@
 ## Features
 
 - **Close duplicates:** closes exact matches automatically and presents similar
-  same-origin paths for review.
+  same-origin paths for review. The latest cleanup can be undone as one
+  transaction until another cleanup starts or the browser session ends.
 - **Sort by domain:** orders pinned and regular tabs within their respective
   sections.
 - **Toggle domain groups:** creates named Chrome tab groups, then turns into an
@@ -53,7 +54,7 @@
 5. Choose the repository folder.
 6. Pin **Tab Control** from Chrome's extensions menu.
 
-Tab groups require Chrome 89 or newer.
+Tab Control requires Chrome 102 or newer.
 
 ## Permissions
 
@@ -62,11 +63,13 @@ Tab groups require Chrome 89 or newer.
 | `tabs` | Read tab addresses and titles, close duplicates, and move tabs. |
 | `tabGroups` | Name, color, create, and remove native Chrome tab groups. |
 | `sessions` | Read and restore Chrome's browser-wide recently closed tabs and windows. |
+| `storage` | Keep the latest duplicate-cleanup transaction in memory for Undo during the current browser session. |
 
 The Recently closed view reflects Chrome-wide session history, including items
-not closed by Tab Control. It is not a separate Tab Control history. All
-processing happens locally; Tab Control does not collect, store, or transmit
-browsing data. See [PRIVACY.md](PRIVACY.md).
+not closed by Tab Control. It is not a separate Tab Control history. Undo state
+stays in memory for the current browser session. All processing happens
+locally; Tab Control does not collect or transmit browsing data. See
+[PRIVACY.md](PRIVACY.md).
 
 ## Development and releases
 
@@ -91,11 +94,13 @@ cross-platform ZIP format.
 ```text
 .
 ├── manifest.json
+├── background.js
 ├── popup.html
 ├── popup.css
 ├── popup.js
 ├── recent-logic.mjs
 ├── tab-logic.mjs
+├── undo-logic.mjs
 ├── icons/
 ├── docs/
 └── tests/
