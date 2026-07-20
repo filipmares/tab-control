@@ -67,15 +67,18 @@ transmit browsing data. See [PRIVACY.md](PRIVACY.md).
 No dependencies or build step are required.
 
 ```sh
-node --test tests/tab-logic.test.mjs
+node --test tests/*.test.mjs
 ```
 
-Every push to `main` validates and packages the extension. When the
-`manifest.json` version has not already been released, the workflow tags that
-commit as `v<version>` and publishes the ZIP archive on GitHub Releases. The
-archive places `manifest.json` at its root, so the same package can be loaded
-unpacked or uploaded to the Chrome Web Store. Chrome only supports direct local
-CRX installation on Linux, so releases use the cross-platform ZIP format.
+Every pull request must select exactly one `release:none`, `release:patch`,
+`release:minor`, or `release:major` label. The label must match its Conventional
+Commit title. After feature PRs merge, Release Please opens or updates a release
+PR with the corresponding `manifest.json` version and changelog. Merging that
+release PR creates the version tag, publishes the GitHub Release, and attaches
+the packaged ZIP archive. The archive places `manifest.json` at its root, so the
+same package can be loaded unpacked or uploaded to the Chrome Web Store. Chrome
+only supports direct local CRX installation on Linux, so releases use the
+cross-platform ZIP format.
 
 ## Project structure
 
