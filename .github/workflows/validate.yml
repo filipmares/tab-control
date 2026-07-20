@@ -21,7 +21,7 @@ jobs:
           node-version: 24
 
       - name: Run logic tests
-        run: node --test tests/tab-logic.test.mjs
+        run: node --test tests/*.test.mjs
 
       - name: Check JavaScript syntax
         run: |
@@ -49,6 +49,8 @@ jobs:
   package:
     name: Package extension
     needs: test
+    outputs:
+      version: ${{ steps.version.outputs.value }}
     runs-on: ubuntu-latest
 
     steps:
@@ -84,58 +86,80 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Tag and publish release
+    name: Prepare or publish release
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: package
     permissions:
       contents: write
+      issues: write
+      pull-requests: write
+      statuses: write
     runs-on: ubuntu-latest
 
     steps:
+      - name: Create or update release pull request
+        id: release
+        uses: googleapis/release-please-action@v4
+
+      - name: Mark generated release pull request
+        if: steps.release.outputs.prs_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PR: ${{ steps.release.outputs.pr }}
+        run: |
+          pr_number=$(jq -r ".number" <<< "$RELEASE_PR")
+          head_sha=$(gh pr view "$pr_number" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json headRefOid \
+            --jq ".headRefOid")
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/statuses/$head_sha" \
+            -f state=success \
+            -f context="Require release impact" \
+            -f description="Release Please PRs are managed automatically."
+
       - name: Check out repository
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - name: Read extension version
-        id: version
-        run: echo "value=$(node -p "require('./manifest.json').version")" >> "$GITHUB_OUTPUT"
-
-      - name: Check whether version is already released
+      - name: Detect release tag
         id: tag
         env:
-          TAG: v${{ steps.version.outputs.value }}
+          VERSION: ${{ needs.package.outputs.version }}
         run: |
-          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
+          tag="v$VERSION"
+          git fetch --force --tags origin
+          if git tag --points-at "$GITHUB_SHA" --list "$tag" | grep -Fx "$tag"; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "value=$tag" >> "$GITHUB_OUTPUT"
           else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Download extension archive
-        if: steps.tag.outputs.exists == 'false'
+        if: steps.tag.outputs.publish == 'true'
         uses: actions/download-artifact@v8
         with:
-          name: tab-control-${{ steps.version.outputs.value }}
+          name: tab-control-${{ needs.package.outputs.version }}
           path: release
 
-      - name: Create version tag
-        if: steps.tag.outputs.exists == 'false'
-        env:
-          TAG: v${{ steps.version.outputs.value }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "Release $TAG"
-          git push origin "$TAG"
-
-      - name: Create GitHub release
-        if: steps.tag.outputs.exists == 'false'
+      - name: Attach extension archive
+        if: steps.tag.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v${{ steps.version.outputs.value }}
-          VERSION: ${{ steps.version.outputs.value }}
+          TAG: ${{ steps.tag.outputs.value }}
+          VERSION: ${{ needs.package.outputs.version }}
         run: |
-          gh release create "$TAG" release/tab-control-"$VERSION".zip \
-            --title "Tab Control $TAG" \
-            --generate-notes
+          archive="release/tab-control-$VERSION.zip"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$archive" \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+          else
+            gh release create "$TAG" "$archive" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Tab Control $TAG" \
+              --generate-notes \
+              --verify-tag
+          fi
