@@ -28,6 +28,9 @@
   ungroup action.
 - **Gather tabs here:** appends loose tabs from other normal windows while
   leaving pinned and grouped tabs untouched.
+- **Recently closed:** shows up to 10 of Chrome's browser-wide recently closed
+  tabs and windows and restores a selected item with Chrome's normal session
+  behavior.
 - **Live feedback:** reports tab, duplicate, possible-match, and site counts.
 
 ## Install from a release
@@ -58,9 +61,12 @@ Tab groups require Chrome 89 or newer.
 | --- | --- |
 | `tabs` | Read tab addresses and titles, close duplicates, and move tabs. |
 | `tabGroups` | Name, color, create, and remove native Chrome tab groups. |
+| `sessions` | Read and restore Chrome's browser-wide recently closed tabs and windows. |
 
-All processing happens locally. Tab Control does not collect, store, or
-transmit browsing data. See [PRIVACY.md](PRIVACY.md).
+The Recently closed view reflects Chrome-wide session history, including items
+not closed by Tab Control. It is not a separate Tab Control history. All
+processing happens locally; Tab Control does not collect, store, or transmit
+browsing data. See [PRIVACY.md](PRIVACY.md).
 
 ## Development and releases
 
@@ -88,6 +94,7 @@ cross-platform ZIP format.
 ├── popup.html
 ├── popup.css
 ├── popup.js
+├── recent-logic.mjs
 ├── tab-logic.mjs
 ├── icons/
 ├── docs/
