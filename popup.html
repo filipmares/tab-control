@@ -13,10 +13,28 @@
           <span></span>
           <span></span>
         </span>
-        <div>
+        <div class="header__copy">
           <h1>Tab Control</h1>
           <p>Control the clutter.</p>
         </div>
+        <button
+          class="header__issue"
+          id="report-issue"
+          type="button"
+          aria-label="Report an issue"
+          title="Report an issue"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            aria-hidden="true"
+          >
+            <path d="M9 5.5 7.5 3.5M15 5.5l1.5-2M7 9H4M20 9h-3M7 14H4M20 14h-3M8.5 19 6 21M15.5 19l2.5 2" />
+            <rect x="7" y="5" width="10" height="15" rx="5" />
+            <path d="M7 11h10M12 11v9" />
+          </svg>
+        </button>
       </header>
 
       <section class="actions" id="tab-actions" aria-label="Tab actions">
@@ -24,6 +42,8 @@
           class="action action--red"
           id="close-duplicates"
           type="button"
+          title="Closes exact duplicate tabs and lets you review similar URLs"
+          aria-description="Closes exact duplicate tabs and lets you review similar URLs"
         >
           <span class="action__icon" aria-hidden="true">×2</span>
           <span class="action__copy">
@@ -36,6 +56,8 @@
           class="action action--yellow"
           id="sort-by-domain"
           type="button"
+          title="Sorts tabs by domain, then orders each site's pages by title"
+          aria-description="Sorts tabs by domain, then orders each site's pages by title"
         >
           <span class="action__icon" aria-hidden="true">A–Z</span>
           <span class="action__copy">
@@ -48,6 +70,8 @@
           class="action action--blue"
           id="toggle-domain-groups"
           type="button"
+          title="Groups sites with two or more tabs by domain"
+          aria-description="Groups sites with two or more tabs by domain"
         >
           <span class="action__icon" id="domain-group-icon" aria-hidden="true">
             GRP
@@ -64,6 +88,8 @@
           class="action action--orange"
           id="gather-tabs-here"
           type="button"
+          title="Gather skips pinned and grouped tabs"
+          aria-description="Gather skips pinned and grouped tabs"
         >
           <span class="action__icon" aria-hidden="true">IN</span>
           <span class="action__copy">
@@ -76,6 +102,8 @@
           class="action action--green"
           id="open-recently-closed"
           type="button"
+          title="Shows Chrome-wide recently closed tabs and windows for restoration"
+          aria-description="Shows Chrome-wide recently closed tabs and windows for restoration"
         >
           <span class="action__icon" aria-hidden="true">RWD</span>
           <span class="action__copy">
@@ -129,7 +157,6 @@
             Back
           </button>
           <div class="recent__heading">
-            <p>Chrome-wide history</p>
             <h2 id="recent-title">Recently closed</h2>
           </div>
           <button class="recent__nav" id="recent-refresh" type="button">
@@ -137,7 +164,7 @@
           </button>
         </div>
 
-        <p class="recent__scope" id="recent-scope">
+        <p class="visually-hidden" id="recent-scope">
           Tabs and windows closed anywhere in Chrome, not only by Tab Control.
         </p>
 
@@ -180,13 +207,6 @@
         </div>
       </div>
 
-      <p class="hint" id="action-hint">Gather skips pinned and grouped tabs</p>
-
-      <footer class="footer">
-        <button class="footer__link" id="report-issue" type="button">
-          Report an issue
-        </button>
-      </footer>
     </main>
 
     <script type="module" src="popup.js"></script>
