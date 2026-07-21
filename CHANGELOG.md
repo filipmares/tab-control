@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1](https://github.com/filipmares/tab-control/compare/v2.1.0...v2.1.1) (2026-07-21)
+
+
+### Bug Fixes
+
+* **release:** include runtime modules in extension archive ([#13](https://github.com/filipmares/tab-control/issues/13)) ([f83eb6d](https://github.com/filipmares/tab-control/commit/f83eb6dc7ffcdb01b50cafbac6ad900c49b57848))
+
 ## [2.1.0](https://github.com/filipmares/tab-control/compare/v2.0.0...v2.1.0) (2026-07-20)
 
 
