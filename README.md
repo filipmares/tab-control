@@ -12,9 +12,9 @@
 
 <p align="center">
   <img
-    src="docs/popup-report-issue.png"
-    width="340"
-    alt="Tab Control popup with tab tools and a Report an issue link"
+    src="docs/tab-control-popup.png"
+    width="360"
+    alt="Tab Control popup with five tab-management actions"
   />
 </p>
 
@@ -33,6 +33,12 @@
   tabs and windows and restores a selected item with Chrome's normal session
   behavior.
 - **Live feedback:** reports tab, duplicate, possible-match, and site counts.
+
+## Screenshots
+
+| Duplicate review | Recently closed |
+| :---: | :---: |
+| <img src="docs/close-both-review.png" width="360" alt="Tab Control duplicate review showing two similar tabs" /> | <img src="docs/recently-closed.png" width="360" alt="Tab Control recently closed view showing tabs and a window available to restore" /> |
 
 ## Install from a release
 
@@ -108,4 +114,6 @@ cross-platform ZIP format.
 
 ## License
 
-[MIT](LICENSE)
+The extension source is licensed under the [MIT License](LICENSE). The bundled
+Archivo font is licensed under the
+[SIL Open Font License 1.1](icons/fonts/Archivo-LICENSE.txt).

@@ -39,7 +39,6 @@ const elements = {
   recentStateMessage: document.querySelector("#recent-state-message"),
   status: document.querySelector("#status"),
   statusText: document.querySelector("#status-text"),
-  actionHint: document.querySelector("#action-hint"),
   undoOffer: document.querySelector("#undo-offer"),
   undoText: document.querySelector("#undo-text"),
   undoCleanup: document.querySelector("#undo-cleanup"),
@@ -106,7 +105,6 @@ function openRecentlyClosed() {
   elements.actions.hidden = true;
   elements.recentView.hidden = false;
   elements.status.hidden = true;
-  elements.actionHint.hidden = true;
   elements.recentBack.focus();
   loadRecentlyClosed();
 }
@@ -116,7 +114,6 @@ async function showActionsView() {
   elements.recentView.hidden = true;
   elements.actions.hidden = false;
   elements.status.hidden = false;
-  elements.actionHint.hidden = false;
   setBusy(true, "Checking this window…");
 
   try {
@@ -867,6 +864,9 @@ function setBusy(busy, message) {
 function syncButtonStates() {
   const actionsUnavailable = state.busy || state.reviewing;
   const shouldUngroup = state.ungroupableDomainCount > 0;
+  const groupActionDescription = shouldUngroup
+    ? "Removes groups that contain tabs from a single domain"
+    : "Groups sites with two or more tabs by domain";
 
   elements.closeDuplicates.disabled =
     actionsUnavailable ||
@@ -894,6 +894,11 @@ function syncButtonStates() {
   elements.domainGroupDescription.textContent = shouldUngroup
     ? "Remove same-domain groups only"
     : "Group sites with two or more tabs";
+  elements.domainGroupToggle.title = groupActionDescription;
+  elements.domainGroupToggle.setAttribute(
+    "aria-description",
+    groupActionDescription,
+  );
   elements.gatherTabsHere.disabled =
     actionsUnavailable || state.gatherableTabCount === 0;
   elements.openRecentlyClosed.disabled = actionsUnavailable;
