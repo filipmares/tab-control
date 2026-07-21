@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.2](https://github.com/filipmares/tab-control/compare/v2.1.1...v2.1.2) (2026-07-21)
+
+
+### Bug Fixes
+
+* improve popup legibility ([#15](https://github.com/filipmares/tab-control/issues/15)) ([97a0c1d](https://github.com/filipmares/tab-control/commit/97a0c1d00d2b285b73f566935252fe4bfa35cd0f))
+
 ## [2.1.1](https://github.com/filipmares/tab-control/compare/v2.1.0...v2.1.1) (2026-07-21)
 
 
