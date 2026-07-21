@@ -25,7 +25,10 @@ jobs:
 
       - name: Check JavaScript syntax
         run: |
+          node --input-type=module --check < background.js
+          node --check recent-logic.mjs
           node --check tab-logic.mjs
+          node --check undo-logic.mjs
           node --input-type=module --check < popup.js
 
       - name: Validate manifest assets
@@ -34,6 +37,7 @@ jobs:
           const fs = require("node:fs");
           const manifest = JSON.parse(fs.readFileSync("manifest.json", "utf8"));
           const assets = [
+            manifest.background.service_worker,
             manifest.action.default_popup,
             ...Object.values(manifest.icons),
             ...Object.values(manifest.action.default_icon),
@@ -65,7 +69,7 @@ jobs:
         run: |
           extension="tab-control-${{ steps.version.outputs.value }}"
           mkdir -p "release/$extension"
-          cp manifest.json popup.html popup.css popup.js tab-logic.mjs "release/$extension"
+          cp manifest.json popup.html popup.css *.js *.mjs "release/$extension"
           cp -R icons "release/$extension"
           (
             cd "release/$extension"
@@ -76,7 +80,17 @@ jobs:
         run: |
           archive="release/tab-control-${{ steps.version.outputs.value }}.zip"
           unzip -t "$archive"
-          unzip -Z1 "$archive" | grep -Fx "manifest.json"
+          archive_files=$(unzip -Z1 "$archive")
+          for required_file in \
+            manifest.json \
+            background.js \
+            popup.js \
+            recent-logic.mjs \
+            tab-logic.mjs \
+            undo-logic.mjs
+          do
+            grep -Fx "$required_file" <<< "$archive_files"
+          done
 
       - name: Upload extension archive
         uses: actions/upload-artifact@v7
