@@ -70,7 +70,7 @@ jobs:
           extension="tab-control-${{ steps.version.outputs.value }}"
           mkdir -p "release/$extension"
           cp manifest.json popup.html popup.css *.js *.mjs "release/$extension"
-          cp -R fonts icons "release/$extension"
+          cp -R icons "release/$extension"
           (
             cd "release/$extension"
             zip -r "../$extension.zip" .
@@ -85,7 +85,6 @@ jobs:
             manifest.json \
             background.js \
             popup.js \
-            fonts/archivo-latin-wght-normal.woff2 \
             recent-logic.mjs \
             tab-logic.mjs \
             undo-logic.mjs

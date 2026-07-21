@@ -107,7 +107,6 @@ cross-platform ZIP format.
 ├── recent-logic.mjs
 ├── tab-logic.mjs
 ├── undo-logic.mjs
-├── fonts/
 ├── icons/
 ├── docs/
 └── tests/
@@ -117,4 +116,4 @@ cross-platform ZIP format.
 
 The extension source is licensed under the [MIT License](LICENSE). The bundled
 Archivo font is licensed under the
-[SIL Open Font License 1.1](fonts/Archivo-LICENSE.txt).
+[SIL Open Font License 1.1](icons/fonts/Archivo-LICENSE.txt).
