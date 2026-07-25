@@ -25,11 +25,13 @@
   changing the remaining matches. The latest cleanup can be undone as one
   transaction until another cleanup starts or the browser session ends.
 - **Sort by domain:** orders pinned and regular tabs within their respective
-  sections.
+  sections, with Undo restoring the previous order and active tab.
 - **Toggle domain groups:** creates named Chrome tab groups, then turns into an
-  ungroup action.
+  ungroup action. Undo restores the prior membership, metadata, order, and
+  active tab.
 - **Gather tabs here:** appends loose tabs from other normal windows while
-  leaving pinned and grouped tabs untouched.
+  leaving pinned and grouped tabs untouched. Undo returns tabs to their
+  original windows and recreates a source window if gathering closed it.
 - **Recently closed:** shows up to 10 of Chrome's browser-wide recently closed
   tabs and windows and restores a selected item with Chrome's normal session
   behavior.
@@ -87,11 +89,13 @@ Tab Control requires Chrome 102 or newer.
 | `tabs` | Read tab addresses and titles, close duplicates, and move tabs. |
 | `tabGroups` | Name, color, create, and remove native Chrome tab groups. |
 | `sessions` | Read and restore Chrome's browser-wide recently closed tabs and windows. |
-| `storage` | Keep the latest duplicate-cleanup transaction in memory for Undo during the current browser session. |
+| `storage` | Keep the latest duplicate-cleanup and organization transactions in memory for Undo during the current browser session. |
 
 The Recently closed view reflects Chrome-wide session history, including items
-not closed by Tab Control. It is not a separate Tab Control history. Undo state
-stays in memory for the current browser session. All processing happens
+not closed by Tab Control. It is not a separate Tab Control history. Undo
+restores the newest available cleanup or organization action after confirming
+that every saved tab is still open. Undo state stays in memory for the current
+browser session. All processing happens
 locally; Tab Control does not collect or transmit browsing data. See
 [PRIVACY.md](PRIVACY.md).
 
@@ -122,6 +126,7 @@ cross-platform ZIP format.
 ├── popup.html
 ├── popup.css
 ├── popup.js
+├── organization-undo.mjs
 ├── recent-logic.mjs
 ├── tab-logic.mjs
 ├── undo-logic.mjs
