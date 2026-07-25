@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icons/icon-128.png" width="96" alt="Tab Control dial icon" />
+  <img src="icons/icon-128.png" width="96" alt="Tab Control extension icon" />
 </p>
 
 <h1 align="center">Tab Control</h1>
@@ -21,7 +21,8 @@
 ## Features
 
 - **Close duplicates:** closes exact matches automatically and presents similar
-  same-origin paths for review. The latest cleanup can be undone as one
+  same-origin paths for review. Review can be stopped at any time without
+  changing the remaining matches. The latest cleanup can be undone as one
   transaction until another cleanup starts or the browser session ends.
 - **Sort by domain:** orders pinned and regular tabs within their respective
   sections.
@@ -32,13 +33,30 @@
 - **Recently closed:** shows up to 10 of Chrome's browser-wide recently closed
   tabs and windows and restores a selected item with Chrome's normal session
   behavior.
+- **Compact addresses:** keeps comparison and history rows even by showing short,
+  single-line addresses. Hover an address to see its complete value.
+- **Keyboard operation:** exposes memorable single-key accelerators for every
+  top-level action and supports <kbd>Esc</kbd> to leave review and recovery views.
 - **Live feedback:** reports tab, duplicate, possible-match, and site counts.
+
+## Keyboard shortcuts
+
+Shortcuts work while the main action view is open.
+
+| Key | Action |
+| --- | --- |
+| <kbd>D</kbd> | Close duplicate tabs |
+| <kbd>S</kbd> | Sort tabs by domain |
+| <kbd>G</kbd> | Group or ungroup tabs |
+| <kbd>A</kbd> | Gather tabs here |
+| <kbd>R</kbd> | Open Recently closed |
+| <kbd>Esc</kbd> | Stop reviewing or return from Recently closed |
 
 ## Screenshots
 
-| Duplicate review | Recently closed |
+| Similar-tab review | Recently closed |
 | :---: | :---: |
-| <img src="docs/close-both-review.png" width="360" alt="Tab Control duplicate review showing two similar tabs" /> | <img src="docs/recently-closed.png" width="360" alt="Tab Control recently closed view showing tabs and a window available to restore" /> |
+| <img src="docs/close-both-review.png" width="360" alt="Tab Control review showing two similar tabs, safe exit, and cleanup undo" /> | <img src="docs/recently-closed.png" width="360" alt="Tab Control Recently closed view showing tabs and windows available to restore" /> |
 
 ## Install from a release
 
