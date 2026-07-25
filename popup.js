@@ -17,6 +17,7 @@ import {
   getDifferenceRange,
   getPopupActionShortcut,
 } from "./popup-ui-logic.mjs";
+import { ORGANIZATION_ACTION } from "./organization-undo.mjs";
 
 const elements = {
   appHeader: document.querySelector("#app-header"),
@@ -47,7 +48,7 @@ const elements = {
   statusText: document.querySelector("#status-text"),
   undoOffer: document.querySelector("#undo-offer"),
   undoText: document.querySelector("#undo-text"),
-  undoCleanup: document.querySelector("#undo-cleanup"),
+  undoAction: document.querySelector("#undo-action"),
   reportIssue: document.querySelector("#report-issue"),
 };
 
@@ -71,7 +72,8 @@ const state = {
   recentLoading: false,
   recentRestoringId: null,
   recentUnavailableIds: new Set(),
-  undoTransaction: null,
+  cleanupUndoTransaction: null,
+  organizationUndoTransaction: null,
 };
 
 elements.closeDuplicates.addEventListener("click", closeDuplicateTabs);
@@ -84,7 +86,7 @@ elements.keepAllReviewTabs.addEventListener("click", keepAllReviewTabs);
 elements.closeAllReviewTabs.addEventListener("click", closeAllReviewTabs);
 elements.recentBack.addEventListener("click", showActionsView);
 elements.recentRefresh.addEventListener("click", () => loadRecentlyClosed());
-elements.undoCleanup.addEventListener("click", undoDuplicateCleanup);
+elements.undoAction.addEventListener("click", undoLatestAction);
 elements.reportIssue.addEventListener("click", openIssueTracker);
 document.addEventListener("keydown", handlePopupKeydown);
 chrome.sessions?.onChanged?.addListener(refreshOpenRecentlyClosedView);
@@ -93,11 +95,14 @@ initialize();
 
 async function initialize() {
   try {
-    const [summary, undoTransaction] = await Promise.all([
-      refreshSummary(),
-      getUndoTransaction(),
-    ]);
-    updateUndoTransaction(undoTransaction);
+    const [summary, cleanupUndoTransaction, organizationUndoTransaction] =
+      await Promise.all([
+        refreshSummary(),
+        getCleanupUndoTransaction(),
+        getOrganizationUndoTransaction(),
+      ]);
+    updateCleanupUndoTransaction(cleanupUndoTransaction);
+    updateOrganizationUndoTransaction(organizationUndoTransaction);
     setStatus(formatSummary(summary, state.partialGroupCount));
   } catch (error) {
     setStatus(`Could not read this window. ${getErrorMessage(error)}`, "error");
@@ -321,7 +326,7 @@ async function closeDuplicateTabs() {
       type: "BEGIN_DUPLICATE_CLEANUP",
       windowId: currentWindow.id,
     });
-    updateUndoTransaction(startedTransaction.transaction);
+    updateCleanupUndoTransaction(startedTransaction.transaction);
 
     const duplicateIds = getDuplicateTabIds(tabs);
     const duplicateTabs = getTabsByIds(tabs, duplicateIds);
@@ -608,17 +613,22 @@ async function sortTabsByDomain() {
       return;
     }
 
-    for (const [index, tabId] of sortedIds.entries()) {
-      await moveTabWithRetry(tabId, index);
-    }
-
+    const currentWindow = await chrome.windows.getCurrent();
+    const result = await beginOrganizationAction({
+      action: ORGANIZATION_ACTION.SORT,
+      label: `Sorted ${tabs.length} ${pluralize("tab", tabs.length)}`,
+      count: tabs.length,
+      windowIds: [currentWindow.id],
+      operation: { tabIds: sortedIds },
+    });
+    handleOrganizationActionResult(result, "Could not sort tabs.");
     const summary = await refreshSummary();
     setStatus(
       `Sorted ${summary.tabCount} ${pluralize("tab", summary.tabCount)} across ${summary.domainCount} ${pluralize("site", summary.domainCount)}.`,
       "success",
     );
   } catch (error) {
-    setStatus(`Could not sort tabs. ${getErrorMessage(error)}`, "error");
+    setStatus(getErrorMessage(error), "error");
   } finally {
     setBusy(false);
   }
@@ -640,29 +650,32 @@ async function groupTabsByDomain() {
       return;
     }
 
-    let groupedTabCount = 0;
-
-    for (const domain of groupingPlan) {
-      const groupId = await runWithTabEditRetry(() =>
-        chrome.tabs.group({ tabIds: domain.tabIds }),
-      );
-
-      await chrome.tabGroups.update(groupId, {
-        title: formatGroupTitle(domain.label),
-        color: getGroupColor(domain.key),
-        collapsed: false,
-      });
-
-      groupedTabCount += domain.tabIds.length;
-    }
-
+    const currentWindow = await chrome.windows.getCurrent();
+    const tabCount = groupingPlan.reduce(
+      (count, domain) => count + domain.tabIds.length,
+      0,
+    );
+    const result = await beginOrganizationAction({
+      action: ORGANIZATION_ACTION.GROUP,
+      label: `Grouped ${tabCount} ${pluralize("tab", tabCount)}`,
+      count: tabCount,
+      windowIds: [currentWindow.id],
+      operation: {
+        groups: groupingPlan.map((domain) => ({
+          tabIds: domain.tabIds,
+          title: formatGroupTitle(domain.label),
+          color: getGroupColor(domain.key),
+        })),
+      },
+    });
+    handleOrganizationActionResult(result, "Could not group tabs.");
     await refreshSummary();
     setStatus(
-      `Grouped ${groupedTabCount} ${pluralize("tab", groupedTabCount)} into ${groupingPlan.length} domain ${pluralize("group", groupingPlan.length)}.`,
+      `Grouped ${tabCount} ${pluralize("tab", tabCount)} into ${groupingPlan.length} domain ${pluralize("group", groupingPlan.length)}.`,
       "success",
     );
   } catch (error) {
-    setStatus(`Could not group tabs. ${getErrorMessage(error)}`, "error");
+    setStatus(getErrorMessage(error), "error");
   } finally {
     setBusy(false);
   }
@@ -691,7 +704,15 @@ async function ungroupDomainGroups() {
     }
 
     const tabIds = ungroupingPlan.flatMap((group) => group.tabIds);
-    await runWithTabEditRetry(() => chrome.tabs.ungroup(tabIds));
+    const currentWindow = await chrome.windows.getCurrent();
+    const result = await beginOrganizationAction({
+      action: ORGANIZATION_ACTION.UNGROUP,
+      label: `Ungrouped ${tabIds.length} ${pluralize("tab", tabIds.length)}`,
+      count: tabIds.length,
+      windowIds: [currentWindow.id],
+      operation: { tabIds },
+    });
+    handleOrganizationActionResult(result, "Could not ungroup tabs.");
     await refreshSummary();
 
     setStatus(
@@ -699,7 +720,7 @@ async function ungroupDomainGroups() {
       "success",
     );
   } catch (error) {
-    setStatus(`Could not ungroup tabs. ${getErrorMessage(error)}`, "error");
+    setStatus(getErrorMessage(error), "error");
   } finally {
     setBusy(false);
   }
@@ -724,25 +745,31 @@ async function gatherTabsHere() {
       return;
     }
 
-    let gatheredTabCount = 0;
-
-    for (const source of gatherPlan) {
-      await runWithTabEditRetry(() =>
-        chrome.tabs.move(source.tabIds, {
-          windowId: currentWindow.id,
-          index: -1,
-        }),
-      );
-      gatheredTabCount += source.tabIds.length;
-    }
-
+    const gatheredTabTotal = gatherPlan.reduce(
+      (count, source) => count + source.tabIds.length,
+      0,
+    );
+    const result = await beginOrganizationAction({
+      action: ORGANIZATION_ACTION.GATHER,
+      label: `Gathered ${gatheredTabTotal} ${pluralize("tab", gatheredTabTotal)}`,
+      count: gatheredTabTotal,
+      windowIds: [
+        currentWindow.id,
+        ...gatherPlan.map((source) => source.windowId),
+      ],
+      operation: {
+        targetWindowId: currentWindow.id,
+        sources: gatherPlan,
+      },
+    });
+    handleOrganizationActionResult(result, "Could not gather tabs.");
     await refreshSummary();
     setStatus(
-      `Gathered ${gatheredTabCount} ${pluralize("tab", gatheredTabCount)} from ${gatherPlan.length} other ${pluralize("window", gatherPlan.length)}.`,
+      `Gathered ${gatheredTabTotal} ${pluralize("tab", gatheredTabTotal)} from ${gatherPlan.length} other ${pluralize("window", gatherPlan.length)}.`,
       "success",
     );
   } catch (error) {
-    setStatus(`Could not gather tabs. ${getErrorMessage(error)}`, "error");
+    setStatus(getErrorMessage(error), "error");
   } finally {
     setBusy(false);
   }
@@ -787,37 +814,54 @@ function queryNormalWindows() {
 }
 
 async function closeTabsForCleanup(tabs) {
-  if (!state.undoTransaction?.id) {
+  if (!state.cleanupUndoTransaction?.id) {
     throw new Error("The duplicate cleanup transaction is unavailable.");
   }
 
   const result = await sendBackgroundMessage({
     type: "CLOSE_CLEANUP_TABS",
-    transactionId: state.undoTransaction.id,
+    transactionId: state.cleanupUndoTransaction.id,
     tabs,
   });
-  updateUndoTransaction(result.transaction);
+  updateCleanupUndoTransaction(result.transaction);
   return result;
 }
 
-async function getUndoTransaction() {
+async function getCleanupUndoTransaction() {
   const result = await sendBackgroundMessage({
     type: "GET_DUPLICATE_CLEANUP_UNDO",
   });
   return result.transaction;
 }
 
-async function undoDuplicateCleanup() {
-  if (state.busy || !state.undoTransaction?.id) {
+async function getOrganizationUndoTransaction() {
+  const result = await sendBackgroundMessage({
+    type: "GET_ORGANIZATION_UNDO",
+  });
+  return result.transaction;
+}
+
+async function undoLatestAction() {
+  const undo = getLatestUndoTransaction();
+
+  if (state.busy || !undo) {
     return;
   }
-
-  const transactionId = state.undoTransaction.id;
 
   if (state.reviewing) {
     leaveReview();
   }
 
+  if (undo.type === "cleanup") {
+    await undoDuplicateCleanup(undo);
+    return;
+  }
+
+  await undoOrganizationAction(undo);
+}
+
+async function undoDuplicateCleanup(undo) {
+  const transactionId = undo.id;
   setBusy(true, "Restoring closed tabs…");
 
   try {
@@ -825,7 +869,7 @@ async function undoDuplicateCleanup() {
       type: "RESTORE_DUPLICATE_CLEANUP",
       transactionId,
     });
-    updateUndoTransaction(result.transaction);
+    updateCleanupUndoTransaction(result.transaction);
     showRestorationOutcome(result.outcome);
     await refreshSummary();
   } catch (error) {
@@ -835,6 +879,49 @@ async function undoDuplicateCleanup() {
     );
   } finally {
     setBusy(false);
+  }
+}
+
+async function undoOrganizationAction(undo) {
+  setBusy(true, "Restoring the previous tab arrangement…");
+
+  try {
+    const result = await sendBackgroundMessage({
+      type: "RESTORE_ORGANIZATION_ACTION",
+      transactionId: undo.id,
+    });
+    updateOrganizationUndoTransaction(result.transaction);
+    showOrganizationRestorationOutcome(result.outcome);
+    await refreshSummary();
+  } catch (error) {
+    setStatus(
+      `Could not restore the previous arrangement. ${getErrorMessage(error)}`,
+      "error",
+    );
+  } finally {
+    setBusy(false);
+  }
+}
+
+function showOrganizationRestorationOutcome(outcome) {
+  switch (outcome.status) {
+    case "restored":
+      setStatus("Restored the previous tab arrangement.", "success");
+      break;
+    case "partial":
+      setStatus(
+        `Undo restored only part of the previous arrangement. ${outcome.error || ""}`.trim(),
+        "error",
+      );
+      break;
+    case "failed":
+      setStatus(
+        `Could not restore the previous arrangement. ${outcome.error || "The saved state is no longer available."}`,
+        "error",
+      );
+      break;
+    default:
+      setStatus("Undo is no longer available.", "error");
   }
 }
 
@@ -873,30 +960,6 @@ function sendBackgroundMessage(message) {
 
     return response;
   });
-}
-
-async function moveTabWithRetry(tabId, index) {
-  await runWithTabEditRetry(() => chrome.tabs.move(tabId, { index }));
-}
-
-async function runWithTabEditRetry(operation) {
-  const retryLimit = 3;
-
-  for (let attempt = 0; attempt <= retryLimit; attempt += 1) {
-    try {
-      return await operation();
-    } catch (error) {
-      const isTemporaryEditLock = getErrorMessage(error).includes(
-        "Tabs cannot be edited right now",
-      );
-
-      if (!isTemporaryEditLock || attempt === retryLimit) {
-        throw error;
-      }
-
-      await wait(60 * (attempt + 1));
-    }
-  }
 }
 
 function setBusy(busy, message) {
@@ -1015,25 +1078,81 @@ function setStatus(message, tone = "neutral") {
   elements.status.dataset.tone = tone;
 }
 
-function updateUndoTransaction(transaction) {
-  state.undoTransaction = transaction;
+function updateCleanupUndoTransaction(transaction) {
+  state.cleanupUndoTransaction = transaction;
+  syncUndoState();
+}
+
+function updateOrganizationUndoTransaction(transaction) {
+  state.organizationUndoTransaction = transaction;
   syncUndoState();
 }
 
 function syncUndoState() {
-  const count = state.undoTransaction?.count || 0;
-  elements.undoOffer.hidden = count === 0;
-  elements.undoCleanup.disabled = state.busy;
+  const undo = getLatestUndoTransaction();
+  elements.undoOffer.hidden = !undo;
+  elements.undoAction.disabled = state.busy;
 
-  if (count === 0) {
+  if (!undo) {
     return;
   }
 
-  elements.undoText.textContent =
-    `Closed ${count} ${pluralize("tab", count)}`;
-  elements.undoCleanup.setAttribute(
+  const description = undo.type === "cleanup"
+    ? `Closed ${undo.count} ${pluralize("tab", undo.count)}`
+    : undo.label;
+  elements.undoText.textContent = description;
+  elements.undoAction.setAttribute(
     "aria-label",
-    `Undo the latest duplicate cleanup and restore ${count} ${pluralize("tab", count)}`,
+    `Undo ${description.toLowerCase()}`,
+  );
+}
+
+function getLatestUndoTransaction() {
+  const candidates = [
+    state.cleanupUndoTransaction?.count > 0 && {
+      ...state.cleanupUndoTransaction,
+      type: "cleanup",
+    },
+    state.organizationUndoTransaction && {
+      ...state.organizationUndoTransaction,
+      type: "organization",
+    },
+  ].filter(Boolean);
+
+  return candidates.sort(
+    (left, right) => right.createdAt - left.createdAt,
+  )[0] || null;
+}
+
+async function beginOrganizationAction({
+  action,
+  label,
+  count,
+  windowIds,
+  operation,
+}) {
+  return sendBackgroundMessage({
+    type: "RUN_ORGANIZATION_ACTION",
+    action,
+    label,
+    count,
+    windowIds,
+    operation,
+  });
+}
+
+function handleOrganizationActionResult(result, failurePrefix) {
+  updateOrganizationUndoTransaction(result.transaction);
+
+  if (result.status === "completed") {
+    return;
+  }
+
+  const undoNotice = result.transaction
+    ? " Undo is available for the changes that were made."
+    : "";
+  throw new Error(
+    `${failurePrefix} ${result.error || "Chrome could not complete the action."}${undoNotice}`,
   );
 }
 
@@ -1084,12 +1203,6 @@ function getGroupColor(key) {
 
 function getTabUrlValue(tab) {
   return tab.pendingUrl || tab.url || "Unknown URL";
-}
-
-function wait(milliseconds) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, milliseconds);
-  });
 }
 
 function openIssueTracker() {
