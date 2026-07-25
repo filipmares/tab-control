@@ -41,6 +41,7 @@ test("formats a recently closed tab with title and domain context", () => {
     kind: "tab",
     title: "Pull request 42",
     context: "github.com",
+    fullContext: "https://www.github.com/example/project/pull/42",
     tabCount: 1,
     representativeTitles: ["Pull request 42"],
     lastModified: 20,

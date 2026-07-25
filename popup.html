@@ -8,7 +8,7 @@
   </head>
   <body>
     <main class="popup">
-      <header class="header">
+      <header class="header" id="app-header">
         <div class="header__copy">
           <h1>Tab Control</h1>
           <p>Control the clutter.</p>
@@ -20,7 +20,7 @@
           aria-label="Report an issue"
           title="Report an issue"
         >
-          Feedback
+          Report issue
         </button>
       </header>
 
@@ -43,6 +43,7 @@
               <strong>Close duplicate tabs</strong>
               <small>Close exact matches; review similar URLs</small>
             </span>
+            <kbd class="action__shortcut" aria-hidden="true">D</kbd>
           </button>
         </div>
 
@@ -69,6 +70,7 @@
                 <strong>Sort tabs by domain</strong>
                 <small>Then order pages by title</small>
               </span>
+              <kbd class="action__shortcut" aria-hidden="true">S</kbd>
             </button>
 
             <button
@@ -91,6 +93,7 @@
                   Group sites with two or more tabs
                 </small>
               </span>
+              <kbd class="action__shortcut" aria-hidden="true">G</kbd>
             </button>
 
             <button
@@ -109,6 +112,7 @@
                 <strong>Gather tabs here</strong>
                 <small>Move loose tabs from other windows</small>
               </span>
+              <kbd class="action__shortcut" aria-hidden="true">A</kbd>
             </button>
           </div>
         </div>
@@ -130,6 +134,7 @@
               <strong>Recently closed</strong>
               <small>Restore from Chrome-wide history</small>
             </span>
+            <kbd class="action__shortcut" aria-hidden="true">R</kbd>
           </button>
         </div>
       </section>
@@ -141,11 +146,22 @@
         hidden
       >
         <div class="review__header">
-          <div>
-            <p>Possible duplicate</p>
-            <h2 id="review-title">Choose what to keep</h2>
+          <button
+            class="review__back"
+            id="stop-review"
+            type="button"
+            title="Stop reviewing similar tabs"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19 12H5m0 0 5-5m-5 5 5 5" />
+            </svg>
+            <span class="visually-hidden">Stop reviewing similar tabs</span>
+          </button>
+          <div class="review__heading">
+            <h2 id="review-title">Review similar tabs</h2>
+            <p id="review-progress">Match 1 of 1</p>
           </div>
-          <span id="review-progress">1 / 1</span>
+          <span class="review__header-spacer" aria-hidden="true"></span>
         </div>
         <div class="review__tabs" id="review-tabs"></div>
         <div class="review__controls">
@@ -173,21 +189,33 @@
         hidden
       >
         <div class="recent__header">
-          <button class="recent__nav" id="recent-back" type="button">
-            <span aria-hidden="true">&larr;</span>
-            Back
+          <button
+            class="recent__nav"
+            id="recent-back"
+            type="button"
+            title="Back to tab actions"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19 12H5m0 0 5-5m-5 5 5 5" />
+            </svg>
+            <span class="visually-hidden">Back to tab actions</span>
           </button>
           <div class="recent__heading">
             <h2 id="recent-title">Recently closed</h2>
+            <p id="recent-scope">Across all Chrome windows</p>
           </div>
-          <button class="recent__nav" id="recent-refresh" type="button">
-            Refresh
+          <button
+            class="recent__nav"
+            id="recent-refresh"
+            type="button"
+            title="Refresh recently closed"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19 7v5h-5M5 17v-5h5M7 8a7 7 0 0 1 11.5 2M17 16a7 7 0 0 1-11.5-2" />
+            </svg>
+            <span class="visually-hidden">Refresh recently closed</span>
           </button>
         </div>
-
-        <p class="visually-hidden" id="recent-scope">
-          Tabs and windows closed anywhere in Chrome, not only by Tab Control.
-        </p>
 
         <div
           class="recent-state"

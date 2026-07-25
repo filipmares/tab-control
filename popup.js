@@ -12,8 +12,14 @@ import {
   createRecentlyClosedViewModel,
   RECENT_SESSION_LIMIT,
 } from "./recent-logic.mjs";
+import {
+  formatCompactUrl,
+  getDifferenceRange,
+  getPopupActionShortcut,
+} from "./popup-ui-logic.mjs";
 
 const elements = {
+  appHeader: document.querySelector("#app-header"),
   actions: document.querySelector("#tab-actions"),
   closeDuplicates: document.querySelector("#close-duplicates"),
   sortByDomain: document.querySelector("#sort-by-domain"),
@@ -27,6 +33,7 @@ const elements = {
   review: document.querySelector("#duplicate-review"),
   reviewTabs: document.querySelector("#review-tabs"),
   reviewProgress: document.querySelector("#review-progress"),
+  stopReview: document.querySelector("#stop-review"),
   keepAllReviewTabs: document.querySelector("#keep-all-review-tabs"),
   closeAllReviewTabs: document.querySelector("#close-all-review-tabs"),
   recentView: document.querySelector("#recent-view"),
@@ -72,12 +79,14 @@ elements.sortByDomain.addEventListener("click", sortTabsByDomain);
 elements.domainGroupToggle.addEventListener("click", toggleDomainGroups);
 elements.gatherTabsHere.addEventListener("click", gatherTabsHere);
 elements.openRecentlyClosed.addEventListener("click", openRecentlyClosed);
+elements.stopReview.addEventListener("click", stopPartialReview);
 elements.keepAllReviewTabs.addEventListener("click", keepAllReviewTabs);
 elements.closeAllReviewTabs.addEventListener("click", closeAllReviewTabs);
 elements.recentBack.addEventListener("click", showActionsView);
 elements.recentRefresh.addEventListener("click", () => loadRecentlyClosed());
 elements.undoCleanup.addEventListener("click", undoDuplicateCleanup);
 elements.reportIssue.addEventListener("click", openIssueTracker);
+document.addEventListener("keydown", handlePopupKeydown);
 chrome.sessions?.onChanged?.addListener(refreshOpenRecentlyClosedView);
 
 initialize();
@@ -101,6 +110,7 @@ function openRecentlyClosed() {
   }
 
   state.view = "recent";
+  elements.appHeader.hidden = true;
   elements.actions.hidden = true;
   elements.recentView.hidden = false;
   elements.status.hidden = true;
@@ -110,6 +120,7 @@ function openRecentlyClosed() {
 
 async function showActionsView() {
   state.view = "actions";
+  elements.appHeader.hidden = false;
   elements.recentView.hidden = true;
   elements.actions.hidden = false;
   elements.status.hidden = false;
@@ -193,8 +204,8 @@ function renderRecentlyClosedItems(items) {
   for (const item of items) {
     const entry = document.createElement("li");
     const button = document.createElement("button");
-    const marker = document.createElement("span");
     const copy = document.createElement("span");
+    const meta = document.createElement("span");
     const type = document.createElement("span");
     const title = document.createElement("strong");
     const context = document.createElement("span");
@@ -208,11 +219,8 @@ function renderRecentlyClosedItems(items) {
     button.setAttribute("aria-label", item.ariaLabel);
     button.addEventListener("click", () => restoreRecentlyClosedItem(item));
 
-    marker.className = "recent-item__marker";
-    marker.textContent = item.kind === "window" ? "WIN" : "TAB";
-    marker.setAttribute("aria-hidden", "true");
-
     copy.className = "recent-item__copy";
+    meta.className = "recent-item__meta";
     type.className = "recent-item__type";
     type.textContent = item.kind === "window" ? "Window" : "Tab";
     title.className = "recent-item__title";
@@ -221,12 +229,16 @@ function renderRecentlyClosedItems(items) {
     context.textContent = item.kind === "window" && representativeTitles
       ? `${item.context} · ${representativeTitles}`
       : item.context;
+    if (item.fullContext) {
+      context.title = item.fullContext;
+    }
     restore.className = "recent-item__restore";
     restore.textContent = "Restore";
     restore.setAttribute("aria-hidden", "true");
 
-    copy.append(type, title, context);
-    button.append(marker, copy, restore);
+    meta.append(type, context);
+    copy.append(title, meta);
+    button.append(copy, restore);
     entry.append(button);
     elements.recentList.append(entry);
   }
@@ -242,7 +254,7 @@ async function restoreRecentlyClosedItem(item) {
   state.recentRestoringId = item.sessionId;
   showRecentState(
     `Restoring ${item.kind}`,
-    "Using Chrome's normal session restore behavior.",
+    "Chrome will reopen this item.",
     "busy",
   );
   syncRecentControlStates();
@@ -252,7 +264,7 @@ async function restoreRecentlyClosedItem(item) {
     state.recentUnavailableIds.add(item.sessionId);
     await loadRecentlyClosed({
       title: `${item.kind === "window" ? "Window" : "Tab"} restored`,
-      message: "Chrome restored the item and refreshed this browser-wide list.",
+      message: "The recently closed list is up to date.",
       tone: "success",
     });
   } catch (error) {
@@ -360,29 +372,37 @@ function startPartialReview(groups, exactClosedCount) {
   state.reviewExactClosedCount = exactClosedCount;
   state.reviewClosedCount = 0;
 
+  elements.appHeader.hidden = true;
   elements.actions.hidden = true;
   elements.review.hidden = false;
   renderReviewGroup();
   syncButtonStates();
 
   setStatus(
-    `Review ${groups.length} possible ${pluralize("match", groups.length)}.`,
+    "Choose which tabs to keep in each similar group.",
   );
 }
 
 function renderReviewGroup() {
   const group = state.reviewGroups[state.reviewIndex];
   elements.reviewProgress.textContent =
-    `${state.reviewIndex + 1} / ${state.reviewGroups.length}`;
+    `Match ${state.reviewIndex + 1} of ${state.reviewGroups.length}`;
   elements.reviewTabs.replaceChildren();
   elements.keepAllReviewTabs.textContent =
     group.length === 2 ? "Keep both tabs" : "Keep all tabs in this match";
   elements.closeAllReviewTabs.textContent =
     group.length === 2 ? "Close both tabs" : "Close all tabs in this match";
 
-  for (const tab of group) {
+  const fullUrls = group.map(getTabUrlValue);
+  const compactUrls = fullUrls.map(formatCompactUrl);
+
+  for (const [tabIndex, tab] of group.entries()) {
+    const stateDescription = [tab.active && "active", tab.pinned && "pinned"]
+      .filter(Boolean)
+      .join(" and ");
     const button = document.createElement("button");
     const copy = document.createElement("span");
+    const titleRow = document.createElement("span");
     const title = document.createElement("span");
     const url = document.createElement("span");
     const choice = document.createElement("span");
@@ -392,19 +412,28 @@ function renderReviewGroup() {
     button.dataset.tabId = String(tab.id);
     button.setAttribute(
       "aria-label",
-      `Keep ${tab.title || formatTabUrl(tab)} and close the other matching tabs`,
+      [
+        `Keep ${tab.title || "untitled tab"}`,
+        fullUrls[tabIndex],
+        stateDescription,
+        "and close the other matching tabs",
+      ]
+        .filter(Boolean)
+        .join(", "),
     );
     button.addEventListener("click", () => keepOnlyReviewTab(tab.id));
 
     copy.className = "review-tab__copy";
+    titleRow.className = "review-tab__title-row";
     title.className = "review-tab__title";
     title.textContent = tab.title || "Untitled tab";
     url.className = "review-tab__url";
-    url.textContent = formatTabUrl(tab);
+    url.title = fullUrls[tabIndex];
+    appendHighlightedUrl(url, compactUrls, tabIndex);
     choice.className = "review-tab__choice";
-    choice.textContent = "Keep";
+    choice.textContent = "Keep this";
 
-    copy.append(title, url);
+    titleRow.append(title);
 
     if (tab.active || tab.pinned) {
       const badge = document.createElement("span");
@@ -412,9 +441,10 @@ function renderReviewGroup() {
       badge.textContent = [tab.active && "Active", tab.pinned && "Pinned"]
         .filter(Boolean)
         .join(" · ");
-      copy.append(badge);
+      titleRow.append(badge);
     }
 
+    copy.append(titleRow, url);
     button.append(copy, choice);
     elements.reviewTabs.append(button);
   }
@@ -423,6 +453,31 @@ function renderReviewGroup() {
   requestAnimationFrame(() => {
     elements.reviewTabs.querySelector("button")?.focus();
   });
+}
+
+async function stopPartialReview() {
+  if (state.busy || !state.reviewing) {
+    return;
+  }
+
+  const remainingCount = state.reviewGroups.length - state.reviewIndex;
+  setBusy(true, "Stopping review…");
+  leaveReview();
+
+  try {
+    await refreshSummary();
+    setStatus(
+      `Review stopped. ${remainingCount} possible ${pluralize("match", remainingCount)} left unchanged.`,
+    );
+  } catch (error) {
+    setStatus(
+      `Review stopped, but this window could not be refreshed. ${getErrorMessage(error)}`,
+      "error",
+    );
+  } finally {
+    setBusy(false);
+    elements.closeDuplicates.focus();
+  }
 }
 
 async function keepOnlyReviewTab(tabId) {
@@ -510,9 +565,7 @@ async function advanceReview() {
 
   if (state.reviewIndex < state.reviewGroups.length) {
     renderReviewGroup();
-    setStatus(
-      `Review possible match ${state.reviewIndex + 1} of ${state.reviewGroups.length}.`,
-    );
+    setStatus("Choose which tabs to keep in this similar group.");
     return;
   }
 
@@ -524,14 +577,7 @@ async function finishPartialReview() {
     state.reviewExactClosedCount + state.reviewClosedCount;
   const reviewedCount = state.reviewGroups.length;
 
-  state.reviewing = false;
-  state.reviewGroups = [];
-  state.reviewIndex = 0;
-  state.reviewExactClosedCount = 0;
-  state.reviewClosedCount = 0;
-
-  elements.review.hidden = true;
-  elements.actions.hidden = false;
+  leaveReview();
   await refreshSummary();
 
   if (totalClosed > 0) {
@@ -767,6 +813,11 @@ async function undoDuplicateCleanup() {
   }
 
   const transactionId = state.undoTransaction.id;
+
+  if (state.reviewing) {
+    leaveReview();
+  }
+
   setBusy(true, "Restoring closed tabs…");
 
   try {
@@ -895,11 +946,67 @@ function syncButtonStates() {
 }
 
 function syncReviewControlStates() {
+  elements.stopReview.disabled = state.busy;
   elements.keepAllReviewTabs.disabled = state.busy;
   elements.closeAllReviewTabs.disabled = state.busy;
 
   for (const button of elements.reviewTabs.querySelectorAll("button")) {
     button.disabled = state.busy;
+  }
+
+  function leaveReview() {
+    state.reviewing = false;
+    state.reviewGroups = [];
+    state.reviewIndex = 0;
+    state.reviewExactClosedCount = 0;
+    state.reviewClosedCount = 0;
+    elements.review.hidden = true;
+    elements.actions.hidden = false;
+    elements.appHeader.hidden = false;
+    syncButtonStates();
+  }
+
+  function handlePopupKeydown(event) {
+    if (event.key === "Escape") {
+      if (state.reviewing) {
+        event.preventDefault();
+        stopPartialReview();
+      } else if (state.view === "recent") {
+        event.preventDefault();
+        showActionsView();
+      }
+      return;
+    }
+
+    if (state.view !== "actions" || state.reviewing || state.busy) {
+      return;
+    }
+
+    const actionId = getPopupActionShortcut(event);
+    const action = actionId ? document.getElementById(actionId) : null;
+
+    if (!action || action.disabled) {
+      return;
+    }
+
+    event.preventDefault();
+    action.click();
+  }
+
+  function appendHighlightedUrl(element, values, valueIndex) {
+    const value = values[valueIndex];
+    const difference = getDifferenceRange(values, valueIndex);
+
+    if (!difference || difference.start === difference.end) {
+      element.textContent = value;
+      return;
+    }
+
+    const before = document.createTextNode(value.slice(0, difference.start));
+    const mark = document.createElement("mark");
+    const after = document.createTextNode(value.slice(difference.end));
+    mark.textContent = value.slice(difference.start, difference.end);
+    element.append(before, mark, after);
   }
 }
 
@@ -975,15 +1082,8 @@ function getGroupColor(key) {
   return colors[hash % colors.length];
 }
 
-function formatTabUrl(tab) {
-  const value = tab.pendingUrl || tab.url || "Unknown URL";
-
-  try {
-    const url = new URL(value);
-    return `${url.hostname}${url.pathname}${url.search}${url.hash}`;
-  } catch {
-    return value;
-  }
+function getTabUrlValue(tab) {
+  return tab.pendingUrl || tab.url || "Unknown URL";
 }
 
 function wait(milliseconds) {
