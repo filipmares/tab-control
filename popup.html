@@ -8,11 +8,7 @@
   </head>
   <body>
     <main class="popup">
-      <header class="header">
-        <span class="brand-mark" aria-hidden="true">
-          <span></span>
-          <span></span>
-        </span>
+      <header class="header" id="app-header">
         <div class="header__copy">
           <h1>Tab Control</h1>
           <p>Control the clutter.</p>
@@ -24,93 +20,123 @@
           aria-label="Report an issue"
           title="Report an issue"
         >
-          <svg
-            viewBox="0 0 24 24"
-            width="16"
-            height="16"
-            aria-hidden="true"
-          >
-            <path d="M9 5.5 7.5 3.5M15 5.5l1.5-2M7 9H4M20 9h-3M7 14H4M20 14h-3M8.5 19 6 21M15.5 19l2.5 2" />
-            <rect x="7" y="5" width="10" height="15" rx="5" />
-            <path d="M7 11h10M12 11v9" />
-          </svg>
+          Report issue
         </button>
       </header>
 
       <section class="actions" id="tab-actions" aria-label="Tab actions">
-        <button
-          class="action action--red"
-          id="close-duplicates"
-          type="button"
-          title="Closes exact duplicate tabs and lets you review similar URLs"
-          aria-description="Closes exact duplicate tabs and lets you review similar URLs"
-        >
-          <span class="action__icon" aria-hidden="true">×2</span>
-          <span class="action__copy">
-            <strong>Close duplicate tabs</strong>
-            <small>Close exact matches; review similar URLs</small>
-          </span>
-        </button>
+        <div class="action-group action-group--primary">
+          <button
+            class="action action--primary action--danger"
+            id="close-duplicates"
+            type="button"
+            title="Closes exact duplicate tabs and lets you review similar URLs"
+            aria-description="Closes exact duplicate tabs and lets you review similar URLs"
+          >
+            <span class="action__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <rect x="3.5" y="5.5" width="11" height="11" />
+                <path d="M9.5 3.5h11v11M14.5 9.5l5 5m0-5-5 5" />
+              </svg>
+            </span>
+            <span class="action__copy">
+              <strong>Close duplicate tabs</strong>
+              <small>Close exact matches; review similar URLs</small>
+            </span>
+            <kbd class="action__shortcut" aria-hidden="true">D</kbd>
+          </button>
+        </div>
 
-        <button
-          class="action action--yellow"
-          id="sort-by-domain"
-          type="button"
-          title="Sorts tabs by domain, then orders each site's pages by title"
-          aria-description="Sorts tabs by domain, then orders each site's pages by title"
+        <div
+          class="action-group action-group--organize"
+          role="group"
+          aria-labelledby="organize-title"
         >
-          <span class="action__icon" aria-hidden="true">A–Z</span>
-          <span class="action__copy">
-            <strong>Sort tabs by domain</strong>
-            <small>Then order pages by title</small>
-          </span>
-        </button>
+          <h2 class="action-group__title" id="organize-title">Organize</h2>
+          <div class="action-group__list">
+            <button
+              class="action"
+              id="sort-by-domain"
+              type="button"
+              title="Sorts tabs by domain, then orders each site's pages by title"
+              aria-description="Sorts tabs by domain, then orders each site's pages by title"
+            >
+              <span class="action__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M4 6h10M4 12h7M4 18h4M17 5v14m0 0-3-3m3 3 3-3" />
+                </svg>
+              </span>
+              <span class="action__copy">
+                <strong>Sort tabs by domain</strong>
+                <small>Then order pages by title</small>
+              </span>
+              <kbd class="action__shortcut" aria-hidden="true">S</kbd>
+            </button>
 
-        <button
-          class="action action--blue"
-          id="toggle-domain-groups"
-          type="button"
-          title="Groups sites with two or more tabs by domain"
-          aria-description="Groups sites with two or more tabs by domain"
-        >
-          <span class="action__icon" id="domain-group-icon" aria-hidden="true">
-            GRP
-          </span>
-          <span class="action__copy">
-            <strong id="domain-group-title">Group tabs by domain</strong>
-            <small id="domain-group-description">
-              Group sites with two or more tabs
-            </small>
-          </span>
-        </button>
+            <button
+              class="action"
+              id="toggle-domain-groups"
+              type="button"
+              title="Groups sites with two or more tabs by domain"
+              aria-description="Groups sites with two or more tabs by domain"
+            >
+              <span class="action__icon" id="domain-group-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <rect x="3.5" y="5.5" width="7" height="13" />
+                  <rect x="13.5" y="5.5" width="7" height="13" />
+                  <path d="M7 2.5v3m10-3v3" />
+                </svg>
+              </span>
+              <span class="action__copy">
+                <strong id="domain-group-title">Group tabs by domain</strong>
+                <small id="domain-group-description">
+                  Group sites with two or more tabs
+                </small>
+              </span>
+              <kbd class="action__shortcut" aria-hidden="true">G</kbd>
+            </button>
 
-        <button
-          class="action action--orange"
-          id="gather-tabs-here"
-          type="button"
-          title="Gather skips pinned and grouped tabs"
-          aria-description="Gather skips pinned and grouped tabs"
-        >
-          <span class="action__icon" aria-hidden="true">IN</span>
-          <span class="action__copy">
-            <strong>Gather tabs here</strong>
-            <small>Move loose tabs from other windows</small>
-          </span>
-        </button>
+            <button
+              class="action"
+              id="gather-tabs-here"
+              type="button"
+              title="Gather skips pinned and grouped tabs"
+              aria-description="Gather skips pinned and grouped tabs"
+            >
+              <span class="action__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M4 7h6M7 4l3 3-3 3M20 17h-6m3-3-3 3 3 3M12 3v18" />
+                </svg>
+              </span>
+              <span class="action__copy">
+                <strong>Gather tabs here</strong>
+                <small>Move loose tabs from other windows</small>
+              </span>
+              <kbd class="action__shortcut" aria-hidden="true">A</kbd>
+            </button>
+          </div>
+        </div>
 
-        <button
-          class="action action--green"
-          id="open-recently-closed"
-          type="button"
-          title="Shows Chrome-wide recently closed tabs and windows for restoration"
-          aria-description="Shows Chrome-wide recently closed tabs and windows for restoration"
-        >
-          <span class="action__icon" aria-hidden="true">RWD</span>
-          <span class="action__copy">
-            <strong>Recently closed</strong>
-            <small>Restore from Chrome-wide history</small>
-          </span>
-        </button>
+        <div class="action-group action-group--recovery">
+          <button
+            class="action action--recovery"
+            id="open-recently-closed"
+            type="button"
+            title="Shows Chrome-wide recently closed tabs and windows for restoration"
+            aria-description="Shows Chrome-wide recently closed tabs and windows for restoration"
+          >
+            <span class="action__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M5 7H2V4M3 7a9 9 0 1 1-1 7M12 7v5l3 2" />
+              </svg>
+            </span>
+            <span class="action__copy">
+              <strong>Recently closed</strong>
+              <small>Restore from Chrome-wide history</small>
+            </span>
+            <kbd class="action__shortcut" aria-hidden="true">R</kbd>
+          </button>
+        </div>
       </section>
 
       <section
@@ -120,11 +146,22 @@
         hidden
       >
         <div class="review__header">
-          <div>
-            <p>Possible duplicate</p>
-            <h2 id="review-title">Choose what to keep</h2>
+          <button
+            class="review__back"
+            id="stop-review"
+            type="button"
+            title="Stop reviewing similar tabs"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19 12H5m0 0 5-5m-5 5 5 5" />
+            </svg>
+            <span class="visually-hidden">Stop reviewing similar tabs</span>
+          </button>
+          <div class="review__heading">
+            <h2 id="review-title">Review similar tabs</h2>
+            <p id="review-progress">Match 1 of 1</p>
           </div>
-          <span id="review-progress">1 / 1</span>
+          <span class="review__header-spacer" aria-hidden="true"></span>
         </div>
         <div class="review__tabs" id="review-tabs"></div>
         <div class="review__controls">
@@ -152,21 +189,33 @@
         hidden
       >
         <div class="recent__header">
-          <button class="recent__nav" id="recent-back" type="button">
-            <span aria-hidden="true">&larr;</span>
-            Back
+          <button
+            class="recent__nav"
+            id="recent-back"
+            type="button"
+            title="Back to tab actions"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19 12H5m0 0 5-5m-5 5 5 5" />
+            </svg>
+            <span class="visually-hidden">Back to tab actions</span>
           </button>
           <div class="recent__heading">
             <h2 id="recent-title">Recently closed</h2>
+            <p id="recent-scope">Across all Chrome windows</p>
           </div>
-          <button class="recent__nav" id="recent-refresh" type="button">
-            Refresh
+          <button
+            class="recent__nav"
+            id="recent-refresh"
+            type="button"
+            title="Refresh recently closed"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19 7v5h-5M5 17v-5h5M7 8a7 7 0 0 1 11.5 2M17 16a7 7 0 0 1-11.5-2" />
+            </svg>
+            <span class="visually-hidden">Refresh recently closed</span>
           </button>
         </div>
-
-        <p class="visually-hidden" id="recent-scope">
-          Tabs and windows closed anywhere in Chrome, not only by Tab Control.
-        </p>
 
         <div
           class="recent-state"
