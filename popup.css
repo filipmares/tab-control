@@ -144,10 +144,6 @@ h1 {
   background: var(--panel);
 }
 
-.action-group--primary {
-  border-block: 1px solid var(--ink);
-}
-
 .action-group--organize {
   margin-top: var(--space-xl);
 }
@@ -160,13 +156,9 @@ h1 {
   line-height: 1.3;
 }
 
-.action-group__list {
-  border-block: 1px solid var(--line);
-}
-
 .action-group--recovery {
   margin-top: var(--space-lg);
-  padding-top: var(--space-xs);
+  padding-top: var(--space-sm);
   border-top: 1px solid var(--ink);
 }
 
