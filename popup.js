@@ -18,7 +18,6 @@ const elements = {
   closeDuplicates: document.querySelector("#close-duplicates"),
   sortByDomain: document.querySelector("#sort-by-domain"),
   domainGroupToggle: document.querySelector("#toggle-domain-groups"),
-  domainGroupIcon: document.querySelector("#domain-group-icon"),
   domainGroupTitle: document.querySelector("#domain-group-title"),
   domainGroupDescription: document.querySelector(
     "#domain-group-description",
@@ -879,15 +878,6 @@ function syncButtonStates() {
       ? state.ungroupableDomainCount === 0
       : state.groupableDomainCount === 0);
 
-  elements.domainGroupToggle.classList.toggle(
-    "action--blue",
-    !shouldUngroup,
-  );
-  elements.domainGroupToggle.classList.toggle(
-    "action--green",
-    shouldUngroup,
-  );
-  elements.domainGroupIcon.textContent = shouldUngroup ? "UNG" : "GRP";
   elements.domainGroupTitle.textContent = shouldUngroup
     ? "Ungroup tabs"
     : "Group tabs by domain";
