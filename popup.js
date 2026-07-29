@@ -953,61 +953,61 @@ function syncReviewControlStates() {
   for (const button of elements.reviewTabs.querySelectorAll("button")) {
     button.disabled = state.busy;
   }
+}
 
-  function leaveReview() {
-    state.reviewing = false;
-    state.reviewGroups = [];
-    state.reviewIndex = 0;
-    state.reviewExactClosedCount = 0;
-    state.reviewClosedCount = 0;
-    elements.review.hidden = true;
-    elements.actions.hidden = false;
-    elements.appHeader.hidden = false;
-    syncButtonStates();
+function leaveReview() {
+  state.reviewing = false;
+  state.reviewGroups = [];
+  state.reviewIndex = 0;
+  state.reviewExactClosedCount = 0;
+  state.reviewClosedCount = 0;
+  elements.review.hidden = true;
+  elements.actions.hidden = false;
+  elements.appHeader.hidden = false;
+  syncButtonStates();
+}
+
+function handlePopupKeydown(event) {
+  if (event.key === "Escape") {
+    if (state.reviewing) {
+      event.preventDefault();
+      stopPartialReview();
+    } else if (state.view === "recent") {
+      event.preventDefault();
+      showActionsView();
+    }
+    return;
   }
 
-  function handlePopupKeydown(event) {
-    if (event.key === "Escape") {
-      if (state.reviewing) {
-        event.preventDefault();
-        stopPartialReview();
-      } else if (state.view === "recent") {
-        event.preventDefault();
-        showActionsView();
-      }
-      return;
-    }
-
-    if (state.view !== "actions" || state.reviewing || state.busy) {
-      return;
-    }
-
-    const actionId = getPopupActionShortcut(event);
-    const action = actionId ? document.getElementById(actionId) : null;
-
-    if (!action || action.disabled) {
-      return;
-    }
-
-    event.preventDefault();
-    action.click();
+  if (state.view !== "actions" || state.reviewing || state.busy) {
+    return;
   }
 
-  function appendHighlightedUrl(element, values, valueIndex) {
-    const value = values[valueIndex];
-    const difference = getDifferenceRange(values, valueIndex);
+  const actionId = getPopupActionShortcut(event);
+  const action = actionId ? document.getElementById(actionId) : null;
 
-    if (!difference || difference.start === difference.end) {
-      element.textContent = value;
-      return;
-    }
-
-    const before = document.createTextNode(value.slice(0, difference.start));
-    const mark = document.createElement("mark");
-    const after = document.createTextNode(value.slice(difference.end));
-    mark.textContent = value.slice(difference.start, difference.end);
-    element.append(before, mark, after);
+  if (!action || action.disabled) {
+    return;
   }
+
+  event.preventDefault();
+  action.click();
+}
+
+function appendHighlightedUrl(element, values, valueIndex) {
+  const value = values[valueIndex];
+  const difference = getDifferenceRange(values, valueIndex);
+
+  if (!difference || difference.start === difference.end) {
+    element.textContent = value;
+    return;
+  }
+
+  const before = document.createTextNode(value.slice(0, difference.start));
+  const mark = document.createElement("mark");
+  const after = document.createTextNode(value.slice(difference.end));
+  mark.textContent = value.slice(difference.start, difference.end);
+  element.append(before, mark, after);
 }
 
 function setStatus(message, tone = "neutral") {
