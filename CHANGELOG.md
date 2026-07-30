@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.1](https://github.com/filipmares/tab-control/compare/v3.0.0...v3.0.1) (2026-07-30)
+
+
+### Bug Fixes
+
+* restore popup helpers to module scope ([#22](https://github.com/filipmares/tab-control/issues/22)) ([a54691f](https://github.com/filipmares/tab-control/commit/a54691f8993a10a91ada0e7cdd587bcec97311a9))
+* restore popup helpers to module scope ([#22](https://github.com/filipmares/tab-control/issues/22)) ([e97f484](https://github.com/filipmares/tab-control/commit/e97f484fd33ec03e942e1fc8d013ee0a7b99677b))
+
 ## [3.0.0](https://github.com/filipmares/tab-control/compare/v2.1.1...v3.0.0) (2026-07-25)
 
 
