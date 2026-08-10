@@ -320,25 +320,13 @@ async function capture(browser, url, target, width, height, options = {}) {
 
   const child = spawn(
     browser,
-    [
-      "--headless=new",
-      "--disable-gpu",
-      "--no-first-run",
-      "--no-default-browser-check",
-      "--disable-background-networking",
-      "--disable-component-update",
-      "--disable-sync",
-      "--hide-scrollbars",
+    browserArgs(profile, [
       `--force-device-scale-factor=${options.deviceScale ?? 2}`,
-      ...(options.transparent
-        ? ["--default-background-color=00000000"]
-        : []),
-      `--user-data-dir=${profile}`,
+      ...(options.transparent ? ["--default-background-color=00000000"] : []),
       `--window-size=${width},${height}`,
-      "--virtual-time-budget=6000",
       `--screenshot=${target}`,
       url,
-    ],
+    ]),
     { stdio: "ignore" },
   );
 
@@ -458,6 +446,75 @@ async function buildIcons(server, browser) {
   console.log(`128x128 ${path.relative(root, storeIcon)}`);
 }
 
+// README screenshots live at 2x the popup's 360px width, cropped to the exact
+// popup height so the repository documentation always shows the shipping UI.
+const docsShots = [
+  { scenario: "actions", file: "docs/tab-control-popup.png" },
+  { scenario: "review", file: "docs/close-both-review.png" },
+  { scenario: "recent", file: "docs/recently-closed.png" },
+];
+
+function browserArgs(profile, extra) {
+  return [
+    "--headless=new",
+    "--disable-gpu",
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--disable-background-networking",
+    "--disable-component-update",
+    "--disable-sync",
+    "--hide-scrollbars",
+    `--user-data-dir=${profile}`,
+    "--virtual-time-budget=6000",
+    ...extra,
+  ];
+}
+
+async function measurePopupHeight(browser, url, profile) {
+  const child = spawn(
+    browser,
+    browserArgs(profile, ["--window-size=360,2000", "--dump-dom", url]),
+    { stdio: ["ignore", "pipe", "ignore"] },
+  );
+
+  let output = "";
+
+  const height = await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error(`Timed out measuring ${url}`));
+    }, 60_000);
+
+    child.stdout.on("data", (chunk) => {
+      output += chunk;
+      const match = output.match(/data-popup-height="(\d+)"/);
+
+      if (match) {
+        clearTimeout(timer);
+        child.kill("SIGKILL");
+        resolve(Number(match[1]));
+      }
+    });
+    child.on("error", reject);
+  });
+
+  return height;
+}
+
+async function buildDocsShots(server, browser) {
+  const port = server.address().port;
+
+  for (const shot of docsShots) {
+    const url = `http://127.0.0.1:${port}/dist/store-assets/popup.html?scenario=${shot.scenario}`;
+    const profile = path.join(stageDir, `profile-docs-${shot.scenario}`);
+    const height = await measurePopupHeight(browser, url, profile);
+    const target = path.join(root, shot.file);
+
+    await capture(browser, url, target, 360, height, { deviceScale: 2 });
+    console.log(`720x${height * 2} ${shot.file}`);
+  }
+}
+
 async function main() {
   await rm(stageDir, { recursive: true, force: true });
   await mkdir(stageDir, { recursive: true });
@@ -495,6 +552,7 @@ async function main() {
 
   try {
     await buildIcons(server, browser);
+    await buildDocsShots(server, browser);
 
     for (const target of targets) {
       const png = path.join(stageDir, `${target.name}.png`);

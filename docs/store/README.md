@@ -28,6 +28,13 @@ shipped raster icons cannot drift from the vector source. Toolbar icons stay
 full-bleed because Chrome adds its own padding; only the listing icon is inset.
 Edit `icons/icon.svg` and rerun the build to change the mark everywhere.
 
+## Repository screenshots
+
+The build also refreshes the README screenshots in `docs/`
+(`tab-control-popup.png`, `close-both-review.png`, `recently-closed.png`). Each
+is captured at twice the popup's 360px width and cropped to the popup's measured
+height, so the documentation cannot fall behind the shipping UI.
+
 ## Regenerating
 
 ```sh

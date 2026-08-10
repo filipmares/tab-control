@@ -131,16 +131,33 @@ function handleBackgroundMessage(message) {
   }
 }
 
+// The popup moves focus when views change, which paints focus rings that imply
+// a keyboard selection the reader did not make. Captures emulate mouse-driven
+// use, so programmatic focus is disabled for the harness only.
+HTMLElement.prototype.focus = function noopFocus() {};
+
 if (scenario.drive) {
   window.addEventListener("load", () => {
     setTimeout(() => {
       document.getElementById(scenario.drive)?.click();
-
-      // The popup focuses controls as views change, so keep clearing focus
-      // until the capture settles to keep screenshots deterministic.
-      for (const delay of [200, 600, 1200, 2000, 3000, 4000]) {
-        setTimeout(() => document.activeElement?.blur(), delay);
-      }
+      setTimeout(() => document.activeElement?.blur(), 200);
     }, 120);
   });
 }
+
+// The build reads this with --dump-dom to size a tightly cropped capture.
+// documentElement.scrollHeight would report the viewport height, so measure the
+// popup element itself.
+window.addEventListener("load", () => {
+  for (const delay of [300, 900, 1800, 3000, 4200]) {
+    setTimeout(() => {
+      const popup = document.querySelector(".popup");
+
+      if (popup) {
+        document.documentElement.dataset.popupHeight = String(
+          Math.ceil(popup.getBoundingClientRect().height),
+        );
+      }
+    }, delay);
+  }
+});
