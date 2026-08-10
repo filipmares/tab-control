@@ -314,7 +314,7 @@ function run(command, args) {
   });
 }
 
-async function capture(browser, url, target, width, height) {
+async function capture(browser, url, target, width, height, options = {}) {
   const profile = path.join(stageDir, `profile-${path.basename(target, ".png")}`);
   await rm(target, { force: true });
 
@@ -329,7 +329,10 @@ async function capture(browser, url, target, width, height) {
       "--disable-component-update",
       "--disable-sync",
       "--hide-scrollbars",
-      "--force-device-scale-factor=2",
+      `--force-device-scale-factor=${options.deviceScale ?? 2}`,
+      ...(options.transparent
+        ? ["--default-background-color=00000000"]
+        : []),
       `--user-data-dir=${profile}`,
       `--window-size=${width},${height}`,
       "--virtual-time-budget=6000",
@@ -347,15 +350,19 @@ async function capture(browser, url, target, width, height) {
   }
 }
 
-async function toStoreImage(pngPath, jpgPath, width, height) {
+async function resize(source, target, width, height) {
   await run("sips", [
     "-z",
     String(height),
     String(width),
-    pngPath,
+    source,
     "--out",
-    jpgPath,
+    target,
   ]);
+}
+
+async function toStoreImage(pngPath, jpgPath, width, height) {
+  await resize(pngPath, jpgPath, width, height);
   await run("sips", [
     "-s",
     "format",
@@ -367,6 +374,88 @@ async function toStoreImage(pngPath, jpgPath, width, height) {
     "--out",
     jpgPath,
   ]);
+}
+
+const ICON_SIZES = [16, 32, 48, 128];
+
+async function iconPage(canvas = 128, mark = 128) {
+  const svg = (await readFile(path.join(root, "icons/icon.svg"), "utf8"))
+    .replace('width="128"', `width="${mark}"`)
+    .replace('height="128"', `height="${mark}"`);
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tab Control icon</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+      }
+
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: ${canvas}px;
+        height: ${canvas}px;
+      }
+
+      svg {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+${svg}
+  </body>
+</html>`;
+}
+
+// The extension PNGs and the listing icon are rendered from icons/icon.svg so
+// the raster sizes can never drift from the vector source. Chrome's store icon
+// guidance asks for a 96x96 mark inside the 128x128 canvas; toolbar icons stay
+// full-bleed because Chrome adds its own padding there.
+async function buildIcons(server, browser) {
+  const port = server.address().port;
+  const master = path.join(stageDir, "icon-master.png");
+  const storeMaster = path.join(stageDir, "icon-store-master.png");
+
+  await writeFile(path.join(stageDir, "icon.html"), await iconPage());
+  await writeFile(
+    path.join(stageDir, "icon-store.html"),
+    await iconPage(128, 96),
+  );
+
+  await capture(
+    browser,
+    `http://127.0.0.1:${port}/dist/store-assets/icon.html`,
+    master,
+    128,
+    128,
+    { transparent: true, deviceScale: 8 },
+  );
+  await capture(
+    browser,
+    `http://127.0.0.1:${port}/dist/store-assets/icon-store.html`,
+    storeMaster,
+    128,
+    128,
+    { transparent: true, deviceScale: 8 },
+  );
+
+  for (const size of ICON_SIZES) {
+    const target = path.join(root, `icons/icon-${size}.png`);
+    await resize(master, target, size, size);
+    console.log(`${size}x${size} ${path.relative(root, target)}`);
+  }
+
+  const storeIcon = path.join(outputDir, "store-icon-128.png");
+  await resize(storeMaster, storeIcon, 128, 128);
+  console.log(`128x128 ${path.relative(root, storeIcon)}`);
 }
 
 async function main() {
@@ -405,6 +494,8 @@ async function main() {
   const browser = findBrowser();
 
   try {
+    await buildIcons(server, browser);
+
     for (const target of targets) {
       const png = path.join(stageDir, `${target.name}.png`);
       const jpg = path.join(outputDir, `${target.name}.jpg`);

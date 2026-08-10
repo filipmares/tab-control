@@ -135,7 +135,12 @@ if (scenario.drive) {
   window.addEventListener("load", () => {
     setTimeout(() => {
       document.getElementById(scenario.drive)?.click();
-      setTimeout(() => document.activeElement?.blur(), 250);
+
+      // The popup focuses controls as views change, so keep clearing focus
+      // until the capture settles to keep screenshots deterministic.
+      for (const delay of [200, 600, 1200, 2000, 3000, 4000]) {
+        setTimeout(() => document.activeElement?.blur(), delay);
+      }
     }, 120);
   });
 }

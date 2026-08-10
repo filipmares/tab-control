@@ -14,8 +14,19 @@ real controls so each screenshot shows output the extension actually produces.
 | `screenshot-05-recently-closed.jpg` | Screenshot | 1280x800 | Chrome-wide recently closed list |
 | `promo-small-tile.jpg` | Small promo tile | 440x280 | Identity only |
 | `promo-marquee-tile.jpg` | Marquee promo tile | 1400x560 | Identity with popup |
+| `store-icon-128.png` | Store icon | 128x128 | 96x96 mark with transparent padding |
 
-All files are JPEG without an alpha channel, matching the store's requirements.
+Screenshots and promo tiles are JPEG without an alpha channel, matching the
+store's requirements. The store icon keeps its alpha channel and follows
+Chrome's guidance to inset the mark to 96x96 inside the 128x128 canvas.
+
+## Icons
+
+The same build renders `icons/icon-16.png`, `icons/icon-32.png`,
+`icons/icon-48.png`, and `icons/icon-128.png` from `icons/icon.svg`, so the
+shipped raster icons cannot drift from the vector source. Toolbar icons stay
+full-bleed because Chrome adds its own padding; only the listing icon is inset.
+Edit `icons/icon.svg` and rerun the build to change the mark everywhere.
 
 ## Regenerating
 
