@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.2](https://github.com/filipmares/tab-control/compare/v3.0.1...v3.0.2) (2026-08-10)
+
+
+### Bug Fixes
+
+* correct the Tab Control icon mark and regenerate listing imagery ([#24](https://github.com/filipmares/tab-control/issues/24)) ([18c3e69](https://github.com/filipmares/tab-control/commit/18c3e695fa98e8ddff055e0ef532e289964a14b5))
+
 ## [3.0.1](https://github.com/filipmares/tab-control/compare/v3.0.0...v3.0.1) (2026-07-30)
 
 
