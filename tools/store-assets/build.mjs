@@ -86,12 +86,16 @@ const screenshots = [
   },
 ];
 
-const dial = (size) => `
-  <svg class="tile__dial" viewBox="0 0 128 128" width="${size}" height="${size}" aria-hidden="true">
-    <circle cx="64" cy="64" r="54" fill="#F2F1EA" stroke="#1C1D1A" stroke-width="6" />
-    <circle cx="64" cy="64" r="25" fill="#1C1D1A" />
-    <path d="M96 24L103 15" fill="none" stroke="#D74C3F" stroke-linecap="round" stroke-width="8" />
-  </svg>`;
+// Promo tiles reuse icons/icon.svg rather than a copy of its markup, so the
+// mark can never differ between the listing art and the shipped icons.
+async function dial(size) {
+  const svg = await readFile(path.join(root, "icons/icon.svg"), "utf8");
+
+  return svg
+    .replace("<svg", '<svg class="tile__dial" aria-hidden="true"')
+    .replace('width="128"', `width="${size}"`)
+    .replace('height="128"', `height="${size}"`);
+}
 
 const barsMarkup = `
   <div class="tile__bars">
@@ -180,7 +184,7 @@ function screenshotPage(config) {
   );
 }
 
-function smallTilePage() {
+async function smallTilePage() {
   return page(
     "Tab Control",
     440,
@@ -190,7 +194,7 @@ function smallTilePage() {
      --tile-meta-size: 10px; --tile-meta-gap: 14px;
      --tile-bars-width: 96px; --tile-bars-height: 5px;`,
     `    <div class="tile">
-      ${dial(96)}
+      ${await dial(96)}
       <div class="tile__copy">
         <p class="tile__name">Tab Control</p>
         <p class="tile__tagline">Control the clutter.</p>
@@ -201,7 +205,7 @@ function smallTilePage() {
   );
 }
 
-function marqueePage() {
+async function marqueePage() {
   return page(
     "Tab Control",
     1400,
@@ -211,7 +215,7 @@ function marqueePage() {
      --tile-meta-size: 15px; --tile-meta-gap: 30px;
      --tile-bars-width: 200px; --tile-bars-height: 8px;`,
     `    <div class="tile">
-      ${dial(150)}
+      ${await dial(150)}
       <div class="tile__copy">
         <p class="tile__name">Tab Control</p>
         <p class="tile__tagline">Control the clutter across every Chrome window.</p>
@@ -530,13 +534,13 @@ async function main() {
     })),
     {
       name: "promo-small-tile",
-      html: smallTilePage(),
+      html: await smallTilePage(),
       width: 440,
       height: 280,
     },
     {
       name: "promo-marquee-tile",
-      html: marqueePage(),
+      html: await marqueePage(),
       width: 1400,
       height: 560,
     },
