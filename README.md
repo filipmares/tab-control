@@ -58,6 +58,9 @@ Shortcuts work while the main action view is open.
 | :---: | :---: |
 | <img src="docs/close-both-review.png" width="360" alt="Tab Control review showing two similar tabs, safe exit, and cleanup undo" /> | <img src="docs/recently-closed.png" width="360" alt="Tab Control Recently closed view showing tabs and windows available to restore" /> |
 
+Chrome Web Store listing imagery lives in [`docs/store`](docs/store) and is
+rendered from the shipping popup with `node tools/store-assets/build.mjs`.
+
 ## Install from a release
 
 1. Go to the [latest release](../../releases/latest) and download the
