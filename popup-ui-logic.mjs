@@ -6,6 +6,45 @@ const ACTION_SHORTCUTS = new Map([
   ["r", "open-recently-closed"],
 ]);
 
+export function createDebouncedRefresh({
+  delay,
+  shouldRefresh,
+  refresh,
+  setTimeoutFn = setTimeout,
+  clearTimeoutFn = clearTimeout,
+}) {
+  let timeoutId = null;
+  let disposed = false;
+
+  return {
+    schedule() {
+      if (disposed || !shouldRefresh()) {
+        return;
+      }
+
+      if (timeoutId !== null) {
+        clearTimeoutFn(timeoutId);
+      }
+
+      timeoutId = setTimeoutFn(() => {
+        timeoutId = null;
+
+        if (shouldRefresh()) {
+          refresh();
+        }
+      }, delay);
+    },
+    dispose() {
+      disposed = true;
+
+      if (timeoutId !== null) {
+        clearTimeoutFn(timeoutId);
+        timeoutId = null;
+      }
+    },
+  };
+}
+
 export function getPopupActionShortcut(event) {
   if (
     event.defaultPrevented ||
