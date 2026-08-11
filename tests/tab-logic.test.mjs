@@ -81,21 +81,21 @@ test("selects every reviewed tab when closing an entire match", () => {
   assert.deepEqual(getReviewTabIdsToClose(tabs, 30), [31]);
 });
 
-test("sorts pinned and regular tabs separately by domain and title", () => {
+test("sorts regular tabs by domain and title while pinned tabs stay put", () => {
   const tabs = [
-    {
-      id: 1,
-      index: 0,
-      pinned: true,
-      title: "Zeta",
-      url: "https://zeta.example/page",
-    },
     {
       id: 2,
       index: 1,
       pinned: true,
       title: "Alpha",
       url: "https://alpha.example/page",
+    },
+    {
+      id: 1,
+      index: 0,
+      pinned: true,
+      title: "Zeta",
+      url: "https://zeta.example/page",
     },
     {
       id: 3,
@@ -120,7 +120,7 @@ test("sorts pinned and regular tabs separately by domain and title", () => {
     },
   ];
 
-  assert.deepEqual(getSortedTabIds(tabs), [2, 1, 5, 4, 3]);
+  assert.deepEqual(getSortedTabIds(tabs), [1, 2, 5, 4, 3]);
 });
 
 test("groups repeated unpinned domains that are not already grouped", () => {

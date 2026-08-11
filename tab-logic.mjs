@@ -103,13 +103,14 @@ export function getReviewTabIdsToClose(tabs, tabIdToKeep) {
 
 export function getSortedTabIds(tabs) {
   const sortableTabs = tabs.filter((tab) => Number.isInteger(tab.id));
-  const pinnedTabs = sortableTabs.filter((tab) => tab.pinned);
-  const regularTabs = sortableTabs.filter((tab) => !tab.pinned);
+  const pinnedTabs = sortableTabs
+    .filter((tab) => tab.pinned)
+    .sort(compareTabsByCurrentIndex);
+  const regularTabs = sortableTabs
+    .filter((tab) => !tab.pinned)
+    .sort(compareTabsForDomainSort);
 
-  return [
-    ...pinnedTabs.sort(compareTabsForDomainSort),
-    ...regularTabs.sort(compareTabsForDomainSort),
-  ].map((tab) => tab.id);
+  return [...pinnedTabs, ...regularTabs].map((tab) => tab.id);
 }
 
 export function getCurrentTabIdOrder(tabs) {
@@ -394,6 +395,11 @@ function compareDuplicateKeepPriority(left, right) {
     return leftIsPinned ? -1 : 1;
   }
 
+  return (left.index ?? Number.MAX_SAFE_INTEGER) -
+    (right.index ?? Number.MAX_SAFE_INTEGER);
+}
+
+function compareTabsByCurrentIndex(left, right) {
   return (left.index ?? Number.MAX_SAFE_INTEGER) -
     (right.index ?? Number.MAX_SAFE_INTEGER);
 }

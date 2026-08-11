@@ -26,8 +26,8 @@
   transaction until another cleanup starts or the browser session ends. Undo
   uses Chrome's session restore to preserve browsing history when available,
   with an address-only fallback for expired session entries.
-- **Sort by domain:** orders pinned and regular tabs within their respective
-  sections.
+- **Sort by domain:** orders regular tabs by domain and title while leaving
+  pinned tabs in the positions you chose.
 - **Toggle domain groups:** creates named Chrome tab groups, then turns into an
   ungroup action.
 - **Gather tabs here:** appends loose tabs from other normal windows while
