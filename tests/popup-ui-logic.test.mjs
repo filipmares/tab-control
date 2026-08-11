@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  createDebouncedRefresh,
   formatCompactUrl,
   getDifferenceRange,
   getPopupActionShortcut,
@@ -19,6 +20,93 @@ function keyboardEvent(key, overrides = {}) {
     ...overrides,
   };
 }
+
+function createFakeTimers() {
+  let nextId = 1;
+  const callbacks = new Map();
+
+  return {
+    callbacks,
+    setTimeoutFn(callback) {
+      const id = nextId;
+      nextId += 1;
+      callbacks.set(id, callback);
+      return id;
+    },
+    clearTimeoutFn(id) {
+      callbacks.delete(id);
+    },
+    runOnly() {
+      assert.equal(callbacks.size, 1);
+      const [[id, callback]] = callbacks;
+      callbacks.delete(id);
+      callback();
+    },
+  };
+}
+
+test("debounces popup refresh requests", () => {
+  const timers = createFakeTimers();
+  let refreshCount = 0;
+  const refresh = createDebouncedRefresh({
+    delay: 100,
+    shouldRefresh: () => true,
+    refresh: () => {
+      refreshCount += 1;
+    },
+    ...timers,
+  });
+
+  refresh.schedule();
+  refresh.schedule();
+  refresh.schedule();
+
+  assert.equal(timers.callbacks.size, 1);
+  timers.runOnly();
+  assert.equal(refreshCount, 1);
+});
+
+test("does not refresh when the popup state is unavailable", () => {
+  const timers = createFakeTimers();
+  let available = false;
+  let refreshCount = 0;
+  const refresh = createDebouncedRefresh({
+    delay: 100,
+    shouldRefresh: () => available,
+    refresh: () => {
+      refreshCount += 1;
+    },
+    ...timers,
+  });
+
+  refresh.schedule();
+  assert.equal(timers.callbacks.size, 0);
+
+  available = true;
+  refresh.schedule();
+  available = false;
+  timers.runOnly();
+  assert.equal(refreshCount, 0);
+});
+
+test("disposes a pending popup refresh", () => {
+  const timers = createFakeTimers();
+  let refreshCount = 0;
+  const refresh = createDebouncedRefresh({
+    delay: 100,
+    shouldRefresh: () => true,
+    refresh: () => {
+      refreshCount += 1;
+    },
+    ...timers,
+  });
+
+  refresh.schedule();
+  refresh.dispose();
+
+  assert.equal(timers.callbacks.size, 0);
+  assert.equal(refreshCount, 0);
+});
 
 test("maps unmodified letter keys to popup actions", () => {
   assert.equal(getPopupActionShortcut(keyboardEvent("d")), "close-duplicates");

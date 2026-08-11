@@ -13,10 +13,13 @@ import {
   RECENT_SESSION_LIMIT,
 } from "./recent-logic.mjs";
 import {
+  createDebouncedRefresh,
   formatCompactUrl,
   getDifferenceRange,
   getPopupActionShortcut,
 } from "./popup-ui-logic.mjs";
+
+const LIVE_SUMMARY_REFRESH_DELAY = 100;
 
 const elements = {
   appHeader: document.querySelector("#app-header"),
@@ -74,6 +77,24 @@ const state = {
   undoTransaction: null,
 };
 
+let liveSummaryRefreshGeneration = 0;
+const liveSummaryRefresh = createDebouncedRefresh({
+  delay: LIVE_SUMMARY_REFRESH_DELAY,
+  shouldRefresh: canRefreshLiveSummary,
+  refresh: () => {
+    void refreshLiveSummary();
+  },
+});
+const liveSummaryTabEvents = [
+  chrome.tabs.onCreated,
+  chrome.tabs.onUpdated,
+  chrome.tabs.onMoved,
+  chrome.tabs.onAttached,
+  chrome.tabs.onDetached,
+  chrome.tabs.onRemoved,
+  chrome.tabs.onReplaced,
+];
+
 elements.closeDuplicates.addEventListener("click", closeDuplicateTabs);
 elements.sortByDomain.addEventListener("click", sortTabsByDomain);
 elements.domainGroupToggle.addEventListener("click", toggleDomainGroups);
@@ -88,6 +109,10 @@ elements.undoCleanup.addEventListener("click", undoDuplicateCleanup);
 elements.reportIssue.addEventListener("click", openIssueTracker);
 document.addEventListener("keydown", handlePopupKeydown);
 chrome.sessions?.onChanged?.addListener(refreshOpenRecentlyClosedView);
+for (const event of liveSummaryTabEvents) {
+  event.addListener(scheduleLiveSummaryRefresh);
+}
+window.addEventListener("unload", disposeLiveSummaryRefresh, { once: true });
 
 initialize();
 
@@ -109,6 +134,7 @@ function openRecentlyClosed() {
     return;
   }
 
+  liveSummaryRefreshGeneration += 1;
   state.view = "recent";
   elements.appHeader.hidden = true;
   elements.actions.hidden = true;
@@ -749,19 +775,75 @@ async function gatherTabsHere() {
 }
 
 async function refreshSummary() {
+  const snapshot = await readSummarySnapshot();
+  return applySummarySnapshot(snapshot);
+}
+
+async function refreshLiveSummary() {
+  const generation = liveSummaryRefreshGeneration;
+
+  try {
+    const snapshot = await readSummarySnapshot();
+
+    if (
+      generation !== liveSummaryRefreshGeneration ||
+      !canRefreshLiveSummary()
+    ) {
+      return;
+    }
+
+    const summary = applySummarySnapshot(snapshot);
+    setStatus(formatSummary(summary, state.partialGroupCount));
+  } catch (error) {
+    if (generation === liveSummaryRefreshGeneration && canRefreshLiveSummary()) {
+      setStatus(
+        `Could not refresh this window. ${getErrorMessage(error)}`,
+        "error",
+      );
+    }
+  }
+}
+
+async function readSummarySnapshot() {
   const [tabs, currentWindow, windows] = await Promise.all([
     queryCurrentWindowTabs(),
     chrome.windows.getCurrent(),
     queryNormalWindows(),
   ]);
-  updateSummaryFromTabs(tabs);
-  state.gatherableTabCount = getGatherTabsPlan(
-    windows,
-    currentWindow,
-  ).reduce((count, source) => count + source.tabIds.length, 0);
+
+  return {
+    tabs,
+    gatherableTabCount: getGatherTabsPlan(windows, currentWindow).reduce(
+      (count, source) => count + source.tabIds.length,
+      0,
+    ),
+  };
+}
+
+function applySummarySnapshot(snapshot) {
+  updateSummaryFromTabs(snapshot.tabs);
+  state.gatherableTabCount = snapshot.gatherableTabCount;
   syncButtonStates();
 
   return state.summary;
+}
+
+function canRefreshLiveSummary() {
+  return state.view === "actions" && !state.busy && !state.reviewing;
+}
+
+function scheduleLiveSummaryRefresh() {
+  liveSummaryRefreshGeneration += 1;
+  liveSummaryRefresh.schedule();
+}
+
+function disposeLiveSummaryRefresh() {
+  liveSummaryRefreshGeneration += 1;
+  liveSummaryRefresh.dispose();
+
+  for (const event of liveSummaryTabEvents) {
+    event.removeListener(scheduleLiveSummaryRefresh);
+  }
 }
 
 function updateSummaryFromTabs(tabs) {
@@ -900,6 +982,10 @@ async function runWithTabEditRetry(operation) {
 }
 
 function setBusy(busy, message) {
+  if (busy) {
+    liveSummaryRefreshGeneration += 1;
+  }
+
   state.busy = busy;
   document.body.toggleAttribute("aria-busy", busy);
   syncButtonStates();
