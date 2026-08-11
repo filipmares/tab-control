@@ -5,7 +5,10 @@ import {
   createDebouncedRefresh,
   formatCompactUrl,
   getDifferenceRange,
+  getHighlightedUrlSegments,
   getPopupActionShortcut,
+  getReviewGroupLabels,
+  getReviewTabPresentation,
 } from "../popup-ui-logic.mjs";
 
 function keyboardEvent(key, overrides = {}) {
@@ -156,4 +159,111 @@ test("formats web addresses as compact domain and path labels", () => {
 test("preserves non-web and invalid addresses", () => {
   assert.equal(formatCompactUrl("chrome://settings"), "chrome://settings");
   assert.equal(formatCompactUrl("not a URL"), "not a URL");
+});
+
+test("splits a URL around the part that differs from its matches", () => {
+  assert.deepEqual(
+    getHighlightedUrlSegments(
+      ["example.com / docs/intro", "example.com / docs/setup"],
+      0,
+    ),
+    { before: "example.com / docs/", highlight: "intro", after: "" },
+  );
+  assert.deepEqual(
+    getHighlightedUrlSegments(["site.com / a/x", "site.com / b/x"], 1),
+    { before: "site.com / ", highlight: "b", after: "/x" },
+  );
+});
+
+test("leaves a URL unhighlighted when nothing distinguishes it", () => {
+  assert.deepEqual(getHighlightedUrlSegments(["example.com"], 0), {
+    before: "example.com",
+    highlight: "",
+    after: "",
+  });
+  assert.deepEqual(
+    getHighlightedUrlSegments(["example.com", "example.com"], 0),
+    { before: "example.com", highlight: "", after: "" },
+  );
+});
+
+test("highlights the extra segment of a longer matching URL", () => {
+  assert.deepEqual(
+    getHighlightedUrlSegments(["example.com / a", "example.com / a/b"], 1),
+    { before: "example.com / a", highlight: "/b", after: "" },
+  );
+  assert.deepEqual(
+    getHighlightedUrlSegments(["example.com / a", "example.com / a/b"], 0),
+    { before: "example.com / a", highlight: "", after: "" },
+  );
+});
+
+test("names the review actions for a pair of tabs", () => {
+  assert.deepEqual(getReviewGroupLabels([{}, {}], 0, 3), {
+    progress: "Match 1 of 3",
+    keepAllLabel: "Keep both tabs",
+    closeAllLabel: "Close both tabs",
+  });
+});
+
+test("names the review actions for a larger match", () => {
+  assert.deepEqual(getReviewGroupLabels([{}, {}, {}], 2, 3), {
+    progress: "Match 3 of 3",
+    keepAllLabel: "Keep all tabs in this match",
+    closeAllLabel: "Close all tabs in this match",
+  });
+});
+
+test("describes a plain review tab", () => {
+  assert.deepEqual(
+    getReviewTabPresentation(
+      { title: "Docs", active: false, pinned: false },
+      "https://example.com/docs",
+    ),
+    {
+      title: "Docs",
+      badge: null,
+      ariaLabel:
+        "Keep Docs, https://example.com/docs, and close the other matching tabs",
+    },
+  );
+});
+
+test("announces the active and pinned state of a review tab", () => {
+  assert.deepEqual(
+    getReviewTabPresentation(
+      { title: "Docs", active: true, pinned: true },
+      "https://example.com/docs",
+    ),
+    {
+      title: "Docs",
+      badge: "Active · Pinned",
+      ariaLabel:
+        "Keep Docs, https://example.com/docs, active and pinned, and close the other matching tabs",
+    },
+  );
+  assert.deepEqual(
+    getReviewTabPresentation(
+      { title: "Docs", active: false, pinned: true },
+      "https://example.com/docs",
+    ),
+    {
+      title: "Docs",
+      badge: "Pinned",
+      ariaLabel:
+        "Keep Docs, https://example.com/docs, pinned, and close the other matching tabs",
+    },
+  );
+});
+
+test("falls back to placeholder copy for an untitled review tab", () => {
+  assert.deepEqual(
+    getReviewTabPresentation({ title: "" }, "https://example.com/"),
+    {
+      title: "Untitled tab",
+      badge: null,
+      ariaLabel:
+        "Keep untitled tab, https://example.com/, and close the other matching tabs",
+    },
+  );
 });

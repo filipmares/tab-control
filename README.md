@@ -129,13 +129,23 @@ cross-platform ZIP format.
 ├── popup.html
 ├── popup.css
 ├── popup.js
+├── chrome-adapter.mjs
+├── popup-control-state.mjs
+├── popup-format.mjs
+├── popup-ui-logic.mjs
 ├── recent-logic.mjs
+├── tab-edit-retry.mjs
 ├── tab-logic.mjs
 ├── undo-logic.mjs
 ├── icons/
 ├── docs/
 └── tests/
 ```
+
+`popup.js` is wiring only: it looks up elements, registers listeners, and
+applies what the modules compute. Every `.mjs` module is free of `chrome` and
+`document`, so it runs under `node --test`; `chrome-adapter.mjs` takes the
+`chrome` namespace as an argument rather than reading the global.
 
 ## License
 

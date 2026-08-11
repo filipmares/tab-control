@@ -112,6 +112,24 @@ export function getSortedTabIds(tabs) {
   ].map((tab) => tab.id);
 }
 
+export function getCurrentTabIdOrder(tabs) {
+  return [...tabs]
+    .sort((left, right) => left.index - right.index)
+    .map((tab) => tab.id);
+}
+
+export function isSameTabOrder(left, right) {
+  return (
+    left.length === right.length &&
+    left.every((tabId, index) => tabId === right[index])
+  );
+}
+
+export function getTabsByIds(tabs, tabIds) {
+  const ids = new Set(tabIds);
+  return tabs.filter((tab) => ids.has(tab.id));
+}
+
 export function getDomainGroupingPlan(tabs) {
   const domains = new Map();
 

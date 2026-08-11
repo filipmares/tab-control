@@ -1,3 +1,5 @@
+import { pluralize } from "./popup-format.mjs";
+
 export const RECENT_SESSION_LIMIT = 10;
 
 export function createRecentlyClosedViewModel(
@@ -49,6 +51,40 @@ export function formatRecentDomain(urlValue) {
   } catch {
     return urlValue;
   }
+}
+
+export function getRecentKindLabel(kind) {
+  return kind === "window" ? "Window" : "Tab";
+}
+
+export function getRecentItemPresentation(item) {
+  const supportingTitles = item.representativeTitles.slice(1).join(" · ");
+
+  return {
+    typeLabel: getRecentKindLabel(item.kind),
+    context: item.kind === "window" && supportingTitles
+      ? `${item.context} · ${supportingTitles}`
+      : item.context,
+    contextTitle: item.fullContext || null,
+  };
+}
+
+export function getRecentListState({ itemCount, notice = null }) {
+  if (itemCount > 0) {
+    return notice
+      ? { title: notice.title, message: notice.message, tone: notice.tone }
+      : null;
+  }
+
+  const restoredEverything = notice?.tone === "success";
+
+  return {
+    title: "Nothing recently closed",
+    message: restoredEverything
+      ? `${notice.message} Chrome's browser-wide list is now empty.`
+      : "Close a tab or window in Chrome, then refresh this view.",
+    tone: restoredEverything ? "success" : "neutral",
+  };
 }
 
 function createRecentlyClosedItem(session) {
@@ -131,8 +167,4 @@ function getTabLabel(tab) {
 
 function getLastModified(session) {
   return Number.isFinite(session?.lastModified) ? session.lastModified : 0;
-}
-
-function pluralize(word, count) {
-  return count === 1 ? word : `${word}s`;
 }

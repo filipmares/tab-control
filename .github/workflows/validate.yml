@@ -26,7 +26,12 @@ jobs:
       - name: Check JavaScript syntax
         run: |
           node --input-type=module --check < background.js
+          node --check chrome-adapter.mjs
+          node --check popup-control-state.mjs
+          node --check popup-format.mjs
+          node --check popup-ui-logic.mjs
           node --check recent-logic.mjs
+          node --check tab-edit-retry.mjs
           node --check tab-logic.mjs
           node --check undo-logic.mjs
           node --input-type=module --check < popup.js
@@ -85,7 +90,12 @@ jobs:
             manifest.json \
             background.js \
             popup.js \
+            chrome-adapter.mjs \
+            popup-control-state.mjs \
+            popup-format.mjs \
+            popup-ui-logic.mjs \
             recent-logic.mjs \
+            tab-edit-retry.mjs \
             tab-logic.mjs \
             undo-logic.mjs
           do
