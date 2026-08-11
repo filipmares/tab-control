@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.3](https://github.com/filipmares/tab-control/compare/v3.0.2...v3.0.3) (2026-08-11)
+
+
+### Bug Fixes
+
+* keep popup tab state current ([#37](https://github.com/filipmares/tab-control/issues/37)) ([51e8794](https://github.com/filipmares/tab-control/commit/51e8794c92d4317fdd0f0380a0cd7f98199e7fa0)), closes [#31](https://github.com/filipmares/tab-control/issues/31)
+* preserve tab history when undoing cleanup ([#39](https://github.com/filipmares/tab-control/issues/39)) ([7c8ad40](https://github.com/filipmares/tab-control/commit/7c8ad407ac51daff3ffc3b4033dd12dc58760a20)), closes [#30](https://github.com/filipmares/tab-control/issues/30)
+
 ## [3.0.2](https://github.com/filipmares/tab-control/compare/v3.0.1...v3.0.2) (2026-08-10)
 
 
