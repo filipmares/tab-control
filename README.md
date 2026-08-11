@@ -23,7 +23,9 @@
 - **Close duplicates:** closes exact matches automatically and presents similar
   same-origin paths for review. Review can be stopped at any time without
   changing the remaining matches. The latest cleanup can be undone as one
-  transaction until another cleanup starts or the browser session ends.
+  transaction until another cleanup starts or the browser session ends. Undo
+  uses Chrome's session restore to preserve browsing history when available,
+  with an address-only fallback for expired session entries.
 - **Sort by domain:** orders pinned and regular tabs within their respective
   sections.
 - **Toggle domain groups:** creates named Chrome tab groups, then turns into an
@@ -94,9 +96,10 @@ Tab Control requires Chrome 102 or newer.
 | `storage` | Keep the latest duplicate-cleanup transaction in memory for Undo during the current browser session. |
 
 The Recently closed view reflects Chrome-wide session history, including items
-not closed by Tab Control. It is not a separate Tab Control history. Undo state
-stays in memory for the current browser session. All processing happens
-locally; Tab Control does not collect or transmit browsing data. See
+not closed by Tab Control. It is not a separate Tab Control history. Undo state,
+including Chrome's temporary identifiers for closed tab sessions, stays in
+memory for the current browser session. All processing happens locally; Tab
+Control does not collect or transmit browsing data. See
 [PRIVACY.md](PRIVACY.md).
 
 ## Development and releases

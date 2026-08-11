@@ -922,18 +922,26 @@ async function undoDuplicateCleanup() {
 
 function showRestorationOutcome(outcome) {
   switch (outcome.status) {
-    case "restored":
+    case "restored": {
+      const detail = outcome.recreated > 0
+        ? ` ${outcome.recreated} ${pluralize("tab", outcome.recreated)} reopened from saved ${outcome.recreated === 1 ? "address" : "addresses"} because Chrome no longer had browsing history.`
+        : " Browsing history was restored.";
       setStatus(
-        `Restored ${outcome.restored} ${pluralize("tab", outcome.restored)}.`,
+        `Restored ${outcome.restored} ${pluralize("tab", outcome.restored)}.${detail}`,
         "success",
       );
       break;
-    case "partial":
+    }
+    case "partial": {
+      const detail = outcome.recreated > 0
+        ? ` ${outcome.recreated} restored ${pluralize("tab", outcome.recreated)} reopened from saved ${outcome.recreated === 1 ? "address" : "addresses"} without browsing history.`
+        : "";
       setStatus(
-        `Restored ${outcome.restored} of ${outcome.total} tabs. ${outcome.failed} could not be restored.`,
+        `Restored ${outcome.restored} of ${outcome.total} tabs. ${outcome.failed} could not be restored.${detail}`,
         "error",
       );
       break;
+    }
     case "failed": {
       const detail = outcome.error ? ` ${outcome.error}` : "";
       setStatus(

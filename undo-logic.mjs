@@ -8,6 +8,11 @@ export const UNDO_TAB_STATE = Object.freeze({
   CLOSED: "closed",
 });
 
+export const UNDO_RESTORATION_METHOD = Object.freeze({
+  SESSION: "session",
+  URL: "url",
+});
+
 export function createUndoTransaction({
   id,
   windowId,
@@ -49,11 +54,54 @@ export function queueClosedTabs(transaction, tabs) {
   };
 }
 
-export function markTabClosed(transaction, originalTabId) {
+export function markTabClosed(transaction, originalTabId, sessionId = null) {
   return updateTransactionTab(transaction, originalTabId, (tab) => ({
     ...tab,
+    sessionId: typeof sessionId === "string" && sessionId ? sessionId : null,
     state: UNDO_TAB_STATE.CLOSED,
   }));
+}
+
+export function findClosedTabSessionId(
+  sessions,
+  snapshot,
+  previousSessionIds = [],
+) {
+  if (!Array.isArray(sessions) || !snapshot) {
+    return null;
+  }
+
+  const previousIds = new Set(previousSessionIds);
+  const candidates = sessions
+    .map((session) => session?.tab)
+    .filter(
+      (tab) =>
+        typeof tab?.sessionId === "string" &&
+        tab.sessionId &&
+        !previousIds.has(tab.sessionId),
+    );
+  const matchingTab = candidates.find(
+    (tab) =>
+      tab.url === snapshot.url &&
+      (!Number.isInteger(tab.windowId) ||
+        tab.windowId === snapshot.windowId),
+  );
+
+  if (matchingTab) {
+    return matchingTab.sessionId;
+  }
+
+  return candidates.length === 1 ? candidates[0].sessionId : null;
+}
+
+export function getClosedTabSessionIds(sessions) {
+  if (!Array.isArray(sessions)) {
+    return [];
+  }
+
+  return sessions
+    .map((session) => session?.tab?.sessionId)
+    .filter((sessionId) => typeof sessionId === "string" && sessionId);
 }
 
 export function discardQueuedTab(transaction, originalTabId) {
@@ -107,15 +155,18 @@ export function markTabRestored(
   transaction,
   originalTabId,
   restoredTabId,
+  restorationMethod = UNDO_RESTORATION_METHOD.URL,
 ) {
   return updateTransactionTab(transaction, originalTabId, (tab) => ({
     ...tab,
-    restoredTabId,
+    restored: true,
+    restoredTabId: Number.isInteger(restoredTabId) ? restoredTabId : null,
+    restorationMethod,
   }));
 }
 
 export function reopenUndoTransaction(transaction) {
-  if (transaction.tabs.some((tab) => Number.isInteger(tab.restoredTabId))) {
+  if (transaction.tabs.some(isTabRestored)) {
     throw new Error("A partially restored transaction cannot be retried.");
   }
 
@@ -127,8 +178,11 @@ export function reopenUndoTransaction(transaction) {
 
 export function getRestorationOutcome(transaction, errors = []) {
   const total = transaction.tabs.length;
-  const restored = transaction.tabs.filter((tab) =>
-    Number.isInteger(tab.restoredTabId),
+  const restored = transaction.tabs.filter(isTabRestored).length;
+  const historyRestored = transaction.tabs.filter(
+    (tab) =>
+      isTabRestored(tab) &&
+      tab.restorationMethod === UNDO_RESTORATION_METHOD.SESSION,
   ).length;
   const failed = total - restored;
 
@@ -141,6 +195,8 @@ export function getRestorationOutcome(transaction, errors = []) {
           : "failed",
     total,
     restored,
+    historyRestored,
+    recreated: restored - historyRestored,
     failed,
     error: errors[0] || null,
   };
@@ -164,6 +220,7 @@ function createTabSnapshot(tab) {
     url,
     pinned: Boolean(tab.pinned),
     incognito: Boolean(tab.incognito),
+    sessionId: null,
     state: UNDO_TAB_STATE.PENDING,
   };
 }
@@ -175,6 +232,10 @@ function updateTransactionTab(transaction, originalTabId, update) {
       tab.originalTabId === originalTabId ? update(tab) : tab,
     ),
   };
+}
+
+function isTabRestored(tab) {
+  return tab.restored === true || Number.isInteger(tab.restoredTabId);
 }
 
 function compareTabSnapshots(left, right) {
