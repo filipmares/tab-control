@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  getCurrentTabIdOrder,
   getDomainInfo,
   getDomainGroupingPlan,
   getDomainUngroupingPlan,
@@ -10,7 +11,9 @@ import {
   getPartialDuplicateGroups,
   getReviewTabIdsToClose,
   getSortedTabIds,
+  getTabsByIds,
   getTabSummary,
+  isSameTabOrder,
 } from "../tab-logic.mjs";
 
 test("keeps the active tab when duplicate URLs are closed", () => {
@@ -387,4 +390,42 @@ test("normalizes common domain labels and reports summary counts", () => {
     duplicateCount: 1,
     domainCount: 2,
   });
+});
+
+test("reads the current tab order by window position", () => {
+  const tabs = [
+    { id: 3, index: 2 },
+    { id: 1, index: 0 },
+    { id: 2, index: 1 },
+  ];
+
+  assert.deepEqual(getCurrentTabIdOrder(tabs), [1, 2, 3]);
+  assert.deepEqual(
+    tabs.map((tab) => tab.id),
+    [3, 1, 2],
+    "the input array is left untouched",
+  );
+  assert.deepEqual(getCurrentTabIdOrder([]), []);
+});
+
+test("detects when the window already matches the sorted order", () => {
+  assert.equal(isSameTabOrder([1, 2, 3], [1, 2, 3]), true);
+  assert.equal(isSameTabOrder([1, 2, 3], [1, 3, 2]), false);
+  assert.equal(isSameTabOrder([1, 2], [1, 2, 3]), false);
+  assert.equal(isSameTabOrder([], []), true);
+});
+
+test("selects tabs by id and keeps their original order", () => {
+  const tabs = [
+    { id: 1, title: "One" },
+    { id: 2, title: "Two" },
+    { id: 3, title: "Three" },
+  ];
+
+  assert.deepEqual(getTabsByIds(tabs, [3, 1]), [
+    { id: 1, title: "One" },
+    { id: 3, title: "Three" },
+  ]);
+  assert.deepEqual(getTabsByIds(tabs, []), []);
+  assert.deepEqual(getTabsByIds(tabs, [9]), []);
 });

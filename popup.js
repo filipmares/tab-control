@@ -1,4 +1,5 @@
 import {
+  getCurrentTabIdOrder,
   getDomainGroupingPlan,
   getDomainUngroupingPlan,
   getDuplicateTabIds,
@@ -6,20 +7,56 @@ import {
   getPartialDuplicateGroups,
   getReviewTabIdsToClose,
   getSortedTabIds,
+  getTabsByIds,
   getTabSummary,
+  isSameTabOrder,
 } from "./tab-logic.mjs";
 import {
   createRecentlyClosedViewModel,
+  getRecentItemPresentation,
+  getRecentKindLabel,
+  getRecentListState,
   RECENT_SESSION_LIMIT,
 } from "./recent-logic.mjs";
 import {
   createDebouncedRefresh,
   formatCompactUrl,
-  getDifferenceRange,
+  getHighlightedUrlSegments,
   getPopupActionShortcut,
+  getReviewGroupLabels,
+  getReviewTabPresentation,
 } from "./popup-ui-logic.mjs";
+import {
+  formatDuplicateCleanupOutcome,
+  formatGatherOutcome,
+  formatGroupOutcome,
+  formatGroupTitle,
+  formatRestorationOutcome,
+  formatReviewOutcome,
+  formatReviewStopped,
+  formatSortOutcome,
+  formatSummary,
+  formatUnclosedTabs,
+  formatUngroupOutcome,
+  getErrorMessage,
+  getGroupColor,
+  getTabUrlValue,
+} from "./popup-format.mjs";
+import {
+  getActionControlState,
+  getRecentControlState,
+  getReviewControlState,
+  getUndoControlState,
+  shouldUngroupDomains,
+} from "./popup-control-state.mjs";
+import { createChromeAdapter } from "./chrome-adapter.mjs";
+import { createTabEditRetry } from "./tab-edit-retry.mjs";
 
 const LIVE_SUMMARY_REFRESH_DELAY = 100;
+const ISSUE_TRACKER_URL = "https://github.com/filipmares/tab-control/issues/new";
+
+const browser = createChromeAdapter(chrome);
+const runWithTabEditRetry = createTabEditRetry();
 
 const elements = {
   appHeader: document.querySelector("#app-header"),
@@ -78,6 +115,7 @@ const state = {
 };
 
 let liveSummaryRefreshGeneration = 0;
+let stopLiveSummaryTabListening = null;
 const liveSummaryRefresh = createDebouncedRefresh({
   delay: LIVE_SUMMARY_REFRESH_DELAY,
   shouldRefresh: canRefreshLiveSummary,
@@ -85,15 +123,6 @@ const liveSummaryRefresh = createDebouncedRefresh({
     void refreshLiveSummary();
   },
 });
-const liveSummaryTabEvents = [
-  chrome.tabs.onCreated,
-  chrome.tabs.onUpdated,
-  chrome.tabs.onMoved,
-  chrome.tabs.onAttached,
-  chrome.tabs.onDetached,
-  chrome.tabs.onRemoved,
-  chrome.tabs.onReplaced,
-];
 
 elements.closeDuplicates.addEventListener("click", closeDuplicateTabs);
 elements.sortByDomain.addEventListener("click", sortTabsByDomain);
@@ -108,10 +137,8 @@ elements.recentRefresh.addEventListener("click", () => loadRecentlyClosed());
 elements.undoCleanup.addEventListener("click", undoDuplicateCleanup);
 elements.reportIssue.addEventListener("click", openIssueTracker);
 document.addEventListener("keydown", handlePopupKeydown);
-chrome.sessions?.onChanged?.addListener(refreshOpenRecentlyClosedView);
-for (const event of liveSummaryTabEvents) {
-  event.addListener(scheduleLiveSummaryRefresh);
-}
+browser.onSessionsChanged(refreshOpenRecentlyClosedView);
+stopLiveSummaryTabListening = browser.onTabsChanged(scheduleLiveSummaryRefresh);
 window.addEventListener("unload", disposeLiveSummaryRefresh, { once: true });
 
 initialize();
@@ -175,7 +202,7 @@ async function loadRecentlyClosed(notice = null) {
   );
   syncRecentControlStates();
 
-  if (typeof chrome.sessions?.getRecentlyClosed !== "function") {
+  if (!browser.isRecentlyClosedAvailable()) {
     state.recentLoading = false;
     elements.recentView.removeAttribute("aria-busy");
     showRecentState(
@@ -188,26 +215,17 @@ async function loadRecentlyClosed(notice = null) {
   }
 
   try {
-    const sessions = await chrome.sessions.getRecentlyClosed({
-      maxResults: RECENT_SESSION_LIMIT,
-    });
+    const sessions = await browser.getRecentlyClosed(RECENT_SESSION_LIMIT);
     const items = createRecentlyClosedViewModel(sessions).filter(
       (item) => !state.recentUnavailableIds.has(item.sessionId),
     );
 
     renderRecentlyClosedItems(items);
 
-    if (items.length === 0) {
-      const message = notice?.tone === "success"
-        ? `${notice.message} Chrome's browser-wide list is now empty.`
-        : "Close a tab or window in Chrome, then refresh this view.";
-      showRecentState(
-        "Nothing recently closed",
-        message,
-        notice?.tone === "success" ? "success" : "neutral",
-      );
-    } else if (notice) {
-      showRecentState(notice.title, notice.message, notice.tone);
+    const listState = getRecentListState({ itemCount: items.length, notice });
+
+    if (listState) {
+      showRecentState(listState.title, listState.message, listState.tone);
     } else {
       elements.recentState.hidden = true;
     }
@@ -228,6 +246,7 @@ function renderRecentlyClosedItems(items) {
   elements.recentList.replaceChildren();
 
   for (const item of items) {
+    const presentation = getRecentItemPresentation(item);
     const entry = document.createElement("li");
     const button = document.createElement("button");
     const copy = document.createElement("span");
@@ -236,7 +255,6 @@ function renderRecentlyClosedItems(items) {
     const title = document.createElement("strong");
     const context = document.createElement("span");
     const restore = document.createElement("span");
-    const representativeTitles = item.representativeTitles.slice(1).join(" · ");
 
     entry.className = "recent__entry";
     button.type = "button";
@@ -248,15 +266,13 @@ function renderRecentlyClosedItems(items) {
     copy.className = "recent-item__copy";
     meta.className = "recent-item__meta";
     type.className = "recent-item__type";
-    type.textContent = item.kind === "window" ? "Window" : "Tab";
+    type.textContent = presentation.typeLabel;
     title.className = "recent-item__title";
     title.textContent = item.title;
     context.className = "recent-item__context";
-    context.textContent = item.kind === "window" && representativeTitles
-      ? `${item.context} · ${representativeTitles}`
-      : item.context;
-    if (item.fullContext) {
-      context.title = item.fullContext;
+    context.textContent = presentation.context;
+    if (presentation.contextTitle) {
+      context.title = presentation.contextTitle;
     }
     restore.className = "recent-item__restore";
     restore.textContent = "Restore";
@@ -286,10 +302,10 @@ async function restoreRecentlyClosedItem(item) {
   syncRecentControlStates();
 
   try {
-    await chrome.sessions.restore(item.sessionId);
+    await browser.restoreSession(item.sessionId);
     state.recentUnavailableIds.add(item.sessionId);
     await loadRecentlyClosed({
-      title: `${item.kind === "window" ? "Window" : "Tab"} restored`,
+      title: `${getRecentKindLabel(item.kind)} restored`,
       message: "The recently closed list is up to date.",
       tone: "success",
     });
@@ -324,12 +340,11 @@ function showRecentState(title, message, tone = "neutral") {
 }
 
 function syncRecentControlStates() {
-  const unavailable =
-    state.recentLoading || Boolean(state.recentRestoringId);
-  elements.recentRefresh.disabled = unavailable;
+  const { controlsDisabled } = getRecentControlState(state);
+  elements.recentRefresh.disabled = controlsDisabled;
 
   for (const button of elements.recentList.querySelectorAll("button")) {
-    button.disabled = unavailable;
+    button.disabled = controlsDisabled;
   }
 }
 
@@ -341,9 +356,9 @@ async function closeDuplicateTabs() {
   setBusy(true, "Finding exact duplicate pages…");
 
   try {
-    const tabs = await queryCurrentWindowTabs();
-    const currentWindow = await chrome.windows.getCurrent();
-    const startedTransaction = await sendBackgroundMessage({
+    const tabs = await browser.queryCurrentWindowTabs();
+    const currentWindow = await browser.getCurrentWindow();
+    const startedTransaction = await browser.sendBackgroundMessage({
       type: "BEGIN_DUPLICATE_CLEANUP",
       windowId: currentWindow.id,
     });
@@ -361,7 +376,7 @@ async function closeDuplicateTabs() {
       closeResult = await closeTabsForCleanup(duplicateTabs);
     }
 
-    const remainingTabs = await queryCurrentWindowTabs();
+    const remainingTabs = await browser.queryCurrentWindowTabs();
     const partialGroups = updateSummaryFromTabs(remainingTabs);
 
     if (partialGroups.length > 0) {
@@ -369,21 +384,12 @@ async function closeDuplicateTabs() {
       return;
     }
 
-    if (duplicateIds.length === 0) {
-      setStatus("No duplicate or similar tab addresses found.");
-      return;
-    }
-
-    if (closeResult.closedNow === 0) {
-      setStatus("Could not close the exact duplicate tabs.", "error");
-    } else if (closeResult.failed > 0) {
-      setStatus(
-        `${closeResult.failed} exact ${pluralize("duplicate", closeResult.failed)} could not be closed.`,
-        "error",
-      );
-    } else {
-      setStatus("Duplicate cleanup complete.", "success");
-    }
+    const outcome = formatDuplicateCleanupOutcome({
+      duplicateCount: duplicateIds.length,
+      closedNow: closeResult.closedNow,
+      failed: closeResult.failed,
+    });
+    setStatus(outcome.message, outcome.tone);
   } catch (error) {
     setStatus(`Could not close duplicates. ${getErrorMessage(error)}`, "error");
   } finally {
@@ -411,21 +417,21 @@ function startPartialReview(groups, exactClosedCount) {
 
 function renderReviewGroup() {
   const group = state.reviewGroups[state.reviewIndex];
-  elements.reviewProgress.textContent =
-    `Match ${state.reviewIndex + 1} of ${state.reviewGroups.length}`;
+  const labels = getReviewGroupLabels(
+    group,
+    state.reviewIndex,
+    state.reviewGroups.length,
+  );
+  elements.reviewProgress.textContent = labels.progress;
   elements.reviewTabs.replaceChildren();
-  elements.keepAllReviewTabs.textContent =
-    group.length === 2 ? "Keep both tabs" : "Keep all tabs in this match";
-  elements.closeAllReviewTabs.textContent =
-    group.length === 2 ? "Close both tabs" : "Close all tabs in this match";
+  elements.keepAllReviewTabs.textContent = labels.keepAllLabel;
+  elements.closeAllReviewTabs.textContent = labels.closeAllLabel;
 
   const fullUrls = group.map(getTabUrlValue);
   const compactUrls = fullUrls.map(formatCompactUrl);
 
   for (const [tabIndex, tab] of group.entries()) {
-    const stateDescription = [tab.active && "active", tab.pinned && "pinned"]
-      .filter(Boolean)
-      .join(" and ");
+    const presentation = getReviewTabPresentation(tab, fullUrls[tabIndex]);
     const button = document.createElement("button");
     const copy = document.createElement("span");
     const titleRow = document.createElement("span");
@@ -436,23 +442,13 @@ function renderReviewGroup() {
     button.type = "button";
     button.className = "review-tab";
     button.dataset.tabId = String(tab.id);
-    button.setAttribute(
-      "aria-label",
-      [
-        `Keep ${tab.title || "untitled tab"}`,
-        fullUrls[tabIndex],
-        stateDescription,
-        "and close the other matching tabs",
-      ]
-        .filter(Boolean)
-        .join(", "),
-    );
+    button.setAttribute("aria-label", presentation.ariaLabel);
     button.addEventListener("click", () => keepOnlyReviewTab(tab.id));
 
     copy.className = "review-tab__copy";
     titleRow.className = "review-tab__title-row";
     title.className = "review-tab__title";
-    title.textContent = tab.title || "Untitled tab";
+    title.textContent = presentation.title;
     url.className = "review-tab__url";
     url.title = fullUrls[tabIndex];
     appendHighlightedUrl(url, compactUrls, tabIndex);
@@ -461,12 +457,10 @@ function renderReviewGroup() {
 
     titleRow.append(title);
 
-    if (tab.active || tab.pinned) {
+    if (presentation.badge) {
       const badge = document.createElement("span");
       badge.className = "review-tab__badge";
-      badge.textContent = [tab.active && "Active", tab.pinned && "Pinned"]
-        .filter(Boolean)
-        .join(" · ");
+      badge.textContent = presentation.badge;
       titleRow.append(badge);
     }
 
@@ -492,9 +486,7 @@ async function stopPartialReview() {
 
   try {
     await refreshSummary();
-    setStatus(
-      `Review stopped. ${remainingCount} possible ${pluralize("match", remainingCount)} left unchanged.`,
-    );
+    setStatus(formatReviewStopped(remainingCount));
   } catch (error) {
     setStatus(
       `Review stopped, but this window could not be refreshed. ${getErrorMessage(error)}`,
@@ -524,9 +516,7 @@ async function keepOnlyReviewTab(tabId) {
       state.reviewClosedCount += result.closedNow;
 
       if (result.failed > 0) {
-        throw new Error(
-          `${result.failed} ${pluralize("tab", result.failed)} could not be closed.`,
-        );
+        throw new Error(formatUnclosedTabs(result.failed));
       }
     }
 
@@ -572,9 +562,7 @@ async function closeAllReviewTabs() {
       state.reviewClosedCount += result.closedNow;
 
       if (result.failed > 0) {
-        throw new Error(
-          `${result.failed} ${pluralize("tab", result.failed)} could not be closed.`,
-        );
+        throw new Error(formatUnclosedTabs(result.failed));
       }
     }
 
@@ -606,13 +594,11 @@ async function finishPartialReview() {
   leaveReview();
   await refreshSummary();
 
-  if (totalClosed > 0) {
-    setStatus("Duplicate cleanup complete.", "success");
-  } else {
-    setStatus(
-      `Kept all tabs from ${reviewedCount} possible ${pluralize("match", reviewedCount)}.`,
-    );
-  }
+  const outcome = formatReviewOutcome({
+    closedCount: totalClosed,
+    reviewedCount,
+  });
+  setStatus(outcome.message, outcome.tone);
 }
 
 async function sortTabsByDomain() {
@@ -623,13 +609,11 @@ async function sortTabsByDomain() {
   setBusy(true, "Filing tabs by domain…");
 
   try {
-    const tabs = await queryCurrentWindowTabs();
-    const currentIds = [...tabs]
-      .sort((left, right) => left.index - right.index)
-      .map((tab) => tab.id);
+    const tabs = await browser.queryCurrentWindowTabs();
+    const currentIds = getCurrentTabIdOrder(tabs);
     const sortedIds = getSortedTabIds(tabs);
 
-    if (arraysMatch(currentIds, sortedIds)) {
+    if (isSameTabOrder(currentIds, sortedIds)) {
       setStatus("This window is already sorted by domain.");
       return;
     }
@@ -639,10 +623,7 @@ async function sortTabsByDomain() {
     }
 
     const summary = await refreshSummary();
-    setStatus(
-      `Sorted ${summary.tabCount} ${pluralize("tab", summary.tabCount)} across ${summary.domainCount} ${pluralize("site", summary.domainCount)}.`,
-      "success",
-    );
+    setStatus(formatSortOutcome(summary), "success");
   } catch (error) {
     setStatus(`Could not sort tabs. ${getErrorMessage(error)}`, "error");
   } finally {
@@ -658,7 +639,7 @@ async function groupTabsByDomain() {
   setBusy(true, "Building domain groups…");
 
   try {
-    const tabs = await queryCurrentWindowTabs();
+    const tabs = await browser.queryCurrentWindowTabs();
     const groupingPlan = getDomainGroupingPlan(tabs);
 
     if (groupingPlan.length === 0) {
@@ -670,10 +651,10 @@ async function groupTabsByDomain() {
 
     for (const domain of groupingPlan) {
       const groupId = await runWithTabEditRetry(() =>
-        chrome.tabs.group({ tabIds: domain.tabIds }),
+        browser.groupTabs(domain.tabIds),
       );
 
-      await chrome.tabGroups.update(groupId, {
+      await browser.updateTabGroup(groupId, {
         title: formatGroupTitle(domain.label),
         color: getGroupColor(domain.key),
         collapsed: false,
@@ -684,7 +665,7 @@ async function groupTabsByDomain() {
 
     await refreshSummary();
     setStatus(
-      `Grouped ${groupedTabCount} ${pluralize("tab", groupedTabCount)} into ${groupingPlan.length} domain ${pluralize("group", groupingPlan.length)}.`,
+      formatGroupOutcome(groupedTabCount, groupingPlan.length),
       "success",
     );
   } catch (error) {
@@ -695,7 +676,7 @@ async function groupTabsByDomain() {
 }
 
 function toggleDomainGroups() {
-  return state.ungroupableDomainCount > 0
+  return shouldUngroupDomains(state)
     ? ungroupDomainGroups()
     : groupTabsByDomain();
 }
@@ -708,7 +689,7 @@ async function ungroupDomainGroups() {
   setBusy(true, "Removing domain groups…");
 
   try {
-    const tabs = await queryCurrentWindowTabs();
+    const tabs = await browser.queryCurrentWindowTabs();
     const ungroupingPlan = getDomainUngroupingPlan(tabs);
 
     if (ungroupingPlan.length === 0) {
@@ -717,11 +698,11 @@ async function ungroupDomainGroups() {
     }
 
     const tabIds = ungroupingPlan.flatMap((group) => group.tabIds);
-    await runWithTabEditRetry(() => chrome.tabs.ungroup(tabIds));
+    await runWithTabEditRetry(() => browser.ungroupTabs(tabIds));
     await refreshSummary();
 
     setStatus(
-      `Ungrouped ${tabIds.length} ${pluralize("tab", tabIds.length)} from ${ungroupingPlan.length} domain ${pluralize("group", ungroupingPlan.length)}.`,
+      formatUngroupOutcome(tabIds.length, ungroupingPlan.length),
       "success",
     );
   } catch (error) {
@@ -740,8 +721,8 @@ async function gatherTabsHere() {
 
   try {
     const [currentWindow, windows] = await Promise.all([
-      chrome.windows.getCurrent(),
-      queryNormalWindows(),
+      browser.getCurrentWindow(),
+      browser.getNormalWindows(),
     ]);
     const gatherPlan = getGatherTabsPlan(windows, currentWindow);
 
@@ -754,17 +735,14 @@ async function gatherTabsHere() {
 
     for (const source of gatherPlan) {
       await runWithTabEditRetry(() =>
-        chrome.tabs.move(source.tabIds, {
-          windowId: currentWindow.id,
-          index: -1,
-        }),
+        browser.moveTabsToWindow(source.tabIds, currentWindow.id),
       );
       gatheredTabCount += source.tabIds.length;
     }
 
     await refreshSummary();
     setStatus(
-      `Gathered ${gatheredTabCount} ${pluralize("tab", gatheredTabCount)} from ${gatherPlan.length} other ${pluralize("window", gatherPlan.length)}.`,
+      formatGatherOutcome(gatheredTabCount, gatherPlan.length),
       "success",
     );
   } catch (error) {
@@ -806,9 +784,9 @@ async function refreshLiveSummary() {
 
 async function readSummarySnapshot() {
   const [tabs, currentWindow, windows] = await Promise.all([
-    queryCurrentWindowTabs(),
-    chrome.windows.getCurrent(),
-    queryNormalWindows(),
+    browser.queryCurrentWindowTabs(),
+    browser.getCurrentWindow(),
+    browser.getNormalWindows(),
   ]);
 
   return {
@@ -840,10 +818,8 @@ function scheduleLiveSummaryRefresh() {
 function disposeLiveSummaryRefresh() {
   liveSummaryRefreshGeneration += 1;
   liveSummaryRefresh.dispose();
-
-  for (const event of liveSummaryTabEvents) {
-    event.removeListener(scheduleLiveSummaryRefresh);
-  }
+  stopLiveSummaryTabListening?.();
+  stopLiveSummaryTabListening = null;
 }
 
 function updateSummaryFromTabs(tabs) {
@@ -857,23 +833,12 @@ function updateSummaryFromTabs(tabs) {
   return partialGroups;
 }
 
-function queryCurrentWindowTabs() {
-  return chrome.tabs.query({ currentWindow: true });
-}
-
-function queryNormalWindows() {
-  return chrome.windows.getAll({
-    populate: true,
-    windowTypes: ["normal"],
-  });
-}
-
 async function closeTabsForCleanup(tabs) {
   if (!state.undoTransaction?.id) {
     throw new Error("The duplicate cleanup transaction is unavailable.");
   }
 
-  const result = await sendBackgroundMessage({
+  const result = await browser.sendBackgroundMessage({
     type: "CLOSE_CLEANUP_TABS",
     transactionId: state.undoTransaction.id,
     tabs,
@@ -883,7 +848,7 @@ async function closeTabsForCleanup(tabs) {
 }
 
 async function getUndoTransaction() {
-  const result = await sendBackgroundMessage({
+  const result = await browser.sendBackgroundMessage({
     type: "GET_DUPLICATE_CLEANUP_UNDO",
   });
   return result.transaction;
@@ -903,7 +868,7 @@ async function undoDuplicateCleanup() {
   setBusy(true, "Restoring closed tabs…");
 
   try {
-    const result = await sendBackgroundMessage({
+    const result = await browser.sendBackgroundMessage({
       type: "RESTORE_DUPLICATE_CLEANUP",
       transactionId,
     });
@@ -921,72 +886,12 @@ async function undoDuplicateCleanup() {
 }
 
 function showRestorationOutcome(outcome) {
-  switch (outcome.status) {
-    case "restored": {
-      const detail = outcome.recreated > 0
-        ? ` ${outcome.recreated} ${pluralize("tab", outcome.recreated)} reopened from saved ${outcome.recreated === 1 ? "address" : "addresses"} because Chrome no longer had browsing history.`
-        : " Browsing history was restored.";
-      setStatus(
-        `Restored ${outcome.restored} ${pluralize("tab", outcome.restored)}.${detail}`,
-        "success",
-      );
-      break;
-    }
-    case "partial": {
-      const detail = outcome.recreated > 0
-        ? ` ${outcome.recreated} restored ${pluralize("tab", outcome.recreated)} reopened from saved ${outcome.recreated === 1 ? "address" : "addresses"} without browsing history.`
-        : "";
-      setStatus(
-        `Restored ${outcome.restored} of ${outcome.total} tabs. ${outcome.failed} could not be restored.${detail}`,
-        "error",
-      );
-      break;
-    }
-    case "failed": {
-      const detail = outcome.error ? ` ${outcome.error}` : "";
-      setStatus(
-        `Could not restore ${outcome.total} closed ${pluralize("tab", outcome.total)}.${detail}`,
-        "error",
-      );
-      break;
-    }
-    default:
-      setStatus("Undo is no longer available.", "error");
-  }
-}
-
-function sendBackgroundMessage(message) {
-  return chrome.runtime.sendMessage(message).then((response) => {
-    if (!response?.ok) {
-      throw new Error(response?.error || "The extension did not respond.");
-    }
-
-    return response;
-  });
+  const { message, tone } = formatRestorationOutcome(outcome);
+  setStatus(message, tone);
 }
 
 async function moveTabWithRetry(tabId, index) {
-  await runWithTabEditRetry(() => chrome.tabs.move(tabId, { index }));
-}
-
-async function runWithTabEditRetry(operation) {
-  const retryLimit = 3;
-
-  for (let attempt = 0; attempt <= retryLimit; attempt += 1) {
-    try {
-      return await operation();
-    } catch (error) {
-      const isTemporaryEditLock = getErrorMessage(error).includes(
-        "Tabs cannot be edited right now",
-      );
-
-      if (!isTemporaryEditLock || attempt === retryLimit) {
-        throw error;
-      }
-
-      await wait(60 * (attempt + 1));
-    }
-  }
+  await runWithTabEditRetry(() => browser.moveTab(tabId, index));
 }
 
 function setBusy(busy, message) {
@@ -1006,46 +911,31 @@ function setBusy(busy, message) {
 }
 
 function syncButtonStates() {
-  const actionsUnavailable = state.busy || state.reviewing;
-  const shouldUngroup = state.ungroupableDomainCount > 0;
-  const groupActionDescription = shouldUngroup
-    ? "Removes groups that contain tabs from a single domain"
-    : "Groups sites with two or more tabs by domain";
+  const controls = getActionControlState(state);
 
-  elements.closeDuplicates.disabled =
-    actionsUnavailable ||
-    (state.summary.duplicateCount === 0 && state.partialGroupCount === 0);
-  elements.sortByDomain.disabled =
-    actionsUnavailable || state.summary.tabCount < 2;
-  elements.domainGroupToggle.disabled =
-    actionsUnavailable ||
-    (shouldUngroup
-      ? state.ungroupableDomainCount === 0
-      : state.groupableDomainCount === 0);
-
-  elements.domainGroupTitle.textContent = shouldUngroup
-    ? "Ungroup tabs"
-    : "Group tabs by domain";
-  elements.domainGroupDescription.textContent = shouldUngroup
-    ? "Remove same-domain groups only"
-    : "Group sites with two or more tabs";
-  elements.domainGroupToggle.title = groupActionDescription;
+  elements.closeDuplicates.disabled = controls.closeDuplicatesDisabled;
+  elements.sortByDomain.disabled = controls.sortByDomainDisabled;
+  elements.domainGroupToggle.disabled = controls.domainGroupToggleDisabled;
+  elements.domainGroupTitle.textContent = controls.domainGroupTitle;
+  elements.domainGroupDescription.textContent = controls.domainGroupDescription;
+  elements.domainGroupToggle.title = controls.domainGroupActionDescription;
   elements.domainGroupToggle.setAttribute(
     "aria-description",
-    groupActionDescription,
+    controls.domainGroupActionDescription,
   );
-  elements.gatherTabsHere.disabled =
-    actionsUnavailable || state.gatherableTabCount === 0;
-  elements.openRecentlyClosed.disabled = actionsUnavailable;
+  elements.gatherTabsHere.disabled = controls.gatherTabsHereDisabled;
+  elements.openRecentlyClosed.disabled = controls.openRecentlyClosedDisabled;
 }
 
 function syncReviewControlStates() {
-  elements.stopReview.disabled = state.busy;
-  elements.keepAllReviewTabs.disabled = state.busy;
-  elements.closeAllReviewTabs.disabled = state.busy;
+  const { controlsDisabled } = getReviewControlState(state);
+
+  elements.stopReview.disabled = controlsDisabled;
+  elements.keepAllReviewTabs.disabled = controlsDisabled;
+  elements.closeAllReviewTabs.disabled = controlsDisabled;
 
   for (const button of elements.reviewTabs.querySelectorAll("button")) {
-    button.disabled = state.busy;
+    button.disabled = controlsDisabled;
   }
 }
 
@@ -1089,19 +979,23 @@ function handlePopupKeydown(event) {
 }
 
 function appendHighlightedUrl(element, values, valueIndex) {
-  const value = values[valueIndex];
-  const difference = getDifferenceRange(values, valueIndex);
+  const { before, highlight, after } = getHighlightedUrlSegments(
+    values,
+    valueIndex,
+  );
 
-  if (!difference || difference.start === difference.end) {
-    element.textContent = value;
+  if (!highlight) {
+    element.textContent = before;
     return;
   }
 
-  const before = document.createTextNode(value.slice(0, difference.start));
   const mark = document.createElement("mark");
-  const after = document.createTextNode(value.slice(difference.end));
-  mark.textContent = value.slice(difference.start, difference.end);
-  element.append(before, mark, after);
+  mark.textContent = highlight;
+  element.append(
+    document.createTextNode(before),
+    mark,
+    document.createTextNode(after),
+  );
 }
 
 function setStatus(message, tone = "neutral") {
@@ -1115,83 +1009,19 @@ function updateUndoTransaction(transaction) {
 }
 
 function syncUndoState() {
-  const count = state.undoTransaction?.count || 0;
-  elements.undoOffer.hidden = count === 0;
-  elements.undoCleanup.disabled = state.busy;
+  const undo = getUndoControlState(state);
 
-  if (count === 0) {
+  elements.undoOffer.hidden = undo.hidden;
+  elements.undoCleanup.disabled = undo.disabled;
+
+  if (undo.hidden) {
     return;
   }
 
-  elements.undoText.textContent =
-    `Closed ${count} ${pluralize("tab", count)}`;
-  elements.undoCleanup.setAttribute(
-    "aria-label",
-    `Undo the latest duplicate cleanup and restore ${count} ${pluralize("tab", count)}`,
-  );
-}
-
-function getTabsByIds(tabs, tabIds) {
-  const ids = new Set(tabIds);
-  return tabs.filter((tab) => ids.has(tab.id));
-}
-
-function arraysMatch(left, right) {
-  return (
-    left.length === right.length &&
-    left.every((value, index) => value === right[index])
-  );
-}
-
-function pluralize(word, count) {
-  return count === 1 ? word : `${word}s`;
-}
-
-function formatSummary(summary, partialGroupCount) {
-  return `${summary.tabCount} ${pluralize("tab", summary.tabCount)} · ${summary.duplicateCount} exact · ${partialGroupCount} possible · ${summary.domainCount} ${pluralize("site", summary.domainCount)}`;
-}
-
-function formatGroupTitle(label) {
-  return label.length <= 24 ? label : `${label.slice(0, 23)}…`;
-}
-
-function getGroupColor(key) {
-  const colors = [
-    "blue",
-    "red",
-    "yellow",
-    "green",
-    "purple",
-    "cyan",
-    "orange",
-    "pink",
-    "grey",
-  ];
-  let hash = 0;
-
-  for (const character of key) {
-    hash = (hash * 31 + character.codePointAt(0)) >>> 0;
-  }
-
-  return colors[hash % colors.length];
-}
-
-function getTabUrlValue(tab) {
-  return tab.pendingUrl || tab.url || "Unknown URL";
-}
-
-function wait(milliseconds) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, milliseconds);
-  });
+  elements.undoText.textContent = undo.text;
+  elements.undoCleanup.setAttribute("aria-label", undo.ariaLabel);
 }
 
 function openIssueTracker() {
-  chrome.tabs.create({
-    url: "https://github.com/filipmares/tab-control/issues/new",
-  });
-}
-
-function getErrorMessage(error) {
-  return error instanceof Error ? error.message : String(error);
+  browser.createTab(ISSUE_TRACKER_URL);
 }

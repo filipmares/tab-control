@@ -4,6 +4,9 @@ import test from "node:test";
 import {
   createRecentlyClosedViewModel,
   formatRecentDomain,
+  getRecentItemPresentation,
+  getRecentKindLabel,
+  getRecentListState,
   RECENT_SESSION_LIMIT,
 } from "../recent-logic.mjs";
 
@@ -104,4 +107,116 @@ test("formats web, local, internal, and unavailable addresses", () => {
   assert.equal(formatRecentDomain("chrome://settings"), "chrome://settings");
   assert.equal(formatRecentDomain("not a URL"), "not a URL");
   assert.equal(formatRecentDomain(""), "Address unavailable");
+});
+
+test("labels recently closed items by kind", () => {
+  assert.equal(getRecentKindLabel("window"), "Window");
+  assert.equal(getRecentKindLabel("tab"), "Tab");
+});
+
+test("appends supporting window titles to the context line", () => {
+  const presentation = getRecentItemPresentation({
+    kind: "window",
+    context: "3 tabs",
+    fullContext: "",
+    representativeTitles: ["First", "Second", "Third"],
+  });
+
+  assert.deepEqual(presentation, {
+    typeLabel: "Window",
+    context: "3 tabs · Second · Third",
+    contextTitle: null,
+  });
+});
+
+test("leaves the context line alone for tabs and single-tab windows", () => {
+  assert.deepEqual(
+    getRecentItemPresentation({
+      kind: "tab",
+      context: "example.com",
+      fullContext: "https://example.com/page",
+      representativeTitles: ["Example"],
+    }),
+    {
+      typeLabel: "Tab",
+      context: "example.com",
+      contextTitle: "https://example.com/page",
+    },
+  );
+  assert.deepEqual(
+    getRecentItemPresentation({
+      kind: "window",
+      context: "1 tab",
+      fullContext: "",
+      representativeTitles: ["Only"],
+    }),
+    { typeLabel: "Window", context: "1 tab", contextTitle: null },
+  );
+});
+
+test("hides the recent state panel when items load without a notice", () => {
+  assert.equal(getRecentListState({ itemCount: 2 }), null);
+});
+
+test("keeps showing a notice above a populated recent list", () => {
+  assert.deepEqual(
+    getRecentListState({
+      itemCount: 2,
+      notice: {
+        title: "Tab restored",
+        message: "The recently closed list is up to date.",
+        tone: "success",
+      },
+    }),
+    {
+      title: "Tab restored",
+      message: "The recently closed list is up to date.",
+      tone: "success",
+    },
+  );
+});
+
+test("explains an empty recent list", () => {
+  assert.deepEqual(getRecentListState({ itemCount: 0 }), {
+    title: "Nothing recently closed",
+    message: "Close a tab or window in Chrome, then refresh this view.",
+    tone: "neutral",
+  });
+});
+
+test("folds a successful restore notice into the empty recent list", () => {
+  assert.deepEqual(
+    getRecentListState({
+      itemCount: 0,
+      notice: {
+        title: "Window restored",
+        message: "The recently closed list is up to date.",
+        tone: "success",
+      },
+    }),
+    {
+      title: "Nothing recently closed",
+      message:
+        "The recently closed list is up to date. Chrome's browser-wide list is now empty.",
+      tone: "success",
+    },
+  );
+});
+
+test("keeps the neutral empty message when a restore failed", () => {
+  assert.deepEqual(
+    getRecentListState({
+      itemCount: 0,
+      notice: {
+        title: "Could not restore tab",
+        message: "It is gone.",
+        tone: "error",
+      },
+    }),
+    {
+      title: "Nothing recently closed",
+      message: "Close a tab or window in Chrome, then refresh this view.",
+      tone: "neutral",
+    },
+  );
 });
