@@ -5,6 +5,8 @@ import {
   claimUndoTransaction,
   createUndoTransaction,
   discardQueuedTab,
+  findClosedTabSessionId,
+  getClosedTabSessionIds,
   getRecoverableTabs,
   getRestorationOutcome,
   getUndoTransactionSummary,
@@ -12,6 +14,7 @@ import {
   markTabRestored,
   queueClosedTabs,
   reopenUndoTransaction,
+  UNDO_RESTORATION_METHOD,
   UNDO_TRANSACTION_STATE,
 } from "../undo-logic.mjs";
 
@@ -52,9 +55,99 @@ test("queues recoverable tab snapshots once without exposing pending closures", 
     url: "https://example.com/loading",
     pinned: true,
     incognito: false,
+    sessionId: null,
     state: "pending",
   });
   assert.equal(getUndoTransactionSummary(queued), null);
+});
+
+test("associates a newly closed Chrome session with its tab snapshot", () => {
+  const sessions = [
+    {
+      tab: {
+        sessionId: "new-session",
+        windowId: 5,
+        url: "https://example.com/loading",
+      },
+    },
+    {
+      tab: {
+        sessionId: "previous-session",
+        windowId: 5,
+        url: "https://example.com/loading",
+      },
+    },
+    {
+      window: {
+        sessionId: "window-session",
+      },
+    },
+  ];
+
+  assert.deepEqual(getClosedTabSessionIds(sessions), [
+    "new-session",
+    "previous-session",
+  ]);
+  assert.equal(
+    findClosedTabSessionId(
+      sessions,
+      {
+        windowId: 5,
+        url: "https://example.com/loading",
+      },
+      ["previous-session"],
+    ),
+    "new-session",
+  );
+});
+
+test("uses the only new tab session when a pending URL changed during close", () => {
+  assert.equal(
+    findClosedTabSessionId(
+      [
+        {
+          tab: {
+            sessionId: "new-session",
+            windowId: 5,
+            url: "https://example.com/finished-loading",
+          },
+        },
+      ],
+      {
+        windowId: 5,
+        url: "https://example.com/loading",
+      },
+    ),
+    "new-session",
+  );
+});
+
+test("does not guess between multiple newly closed tab sessions", () => {
+  assert.equal(
+    findClosedTabSessionId(
+      [
+        {
+          tab: {
+            sessionId: "other-one",
+            windowId: 8,
+            url: "https://example.com/other-one",
+          },
+        },
+        {
+          tab: {
+            sessionId: "other-two",
+            windowId: 9,
+            url: "https://example.com/other-two",
+          },
+        },
+      ],
+      {
+        windowId: 5,
+        url: "https://example.com/loading",
+      },
+    ),
+    null,
+  );
 });
 
 test("tracks only confirmed extension closures in the undo summary", () => {
@@ -75,7 +168,7 @@ test("tracks only confirmed extension closures in the undo summary", () => {
       },
     ],
   );
-  const closed = markTabClosed(queued, 20);
+  const closed = markTabClosed(queued, 20, "session-20");
   const failedRemoved = discardQueuedTab(closed, 21);
 
   assert.deepEqual(getUndoTransactionSummary(failedRemoved), {
@@ -87,6 +180,7 @@ test("tracks only confirmed extension closures in the undo summary", () => {
     getRecoverableTabs(failedRemoved).map((tab) => tab.originalTabId),
     [20],
   );
+  assert.equal(getRecoverableTabs(failedRemoved)[0].sessionId, "session-20");
 });
 
 test("claims all closed tabs in original order and prevents another claim", () => {
@@ -173,6 +267,8 @@ test("reports full, partial, and failed restoration outcomes", () => {
     status: "failed",
     total: 2,
     restored: 0,
+    historyRestored: 0,
+    recreated: 0,
     failed: 2,
     error: "blocked",
   });
@@ -181,11 +277,18 @@ test("reports full, partial, and failed restoration outcomes", () => {
     UNDO_TRANSACTION_STATE.OPEN,
   );
 
-  claimed = markTabRestored(claimed, 50, 150);
+  claimed = markTabRestored(
+    claimed,
+    50,
+    150,
+    UNDO_RESTORATION_METHOD.SESSION,
+  );
   assert.deepEqual(getRestorationOutcome(claimed, ["blocked"]), {
     status: "partial",
     total: 2,
     restored: 1,
+    historyRestored: 1,
+    recreated: 0,
     failed: 1,
     error: "blocked",
   });
@@ -199,6 +302,8 @@ test("reports full, partial, and failed restoration outcomes", () => {
     status: "restored",
     total: 2,
     restored: 2,
+    historyRestored: 1,
+    recreated: 1,
     failed: 0,
     error: null,
   });

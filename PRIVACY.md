@@ -11,11 +11,12 @@ Tab Control does not:
 - use analytics or tracking services;
 - keep a permanent or synced tab history.
 
-For the Undo feature, Tab Control keeps the addresses and positions of tabs
-closed by the latest duplicate cleanup in Chrome's in-memory session storage.
-This one transaction is replaced by the next cleanup, removed after Undo, and
-cleared when Chrome restarts, the extension reloads, or the extension is
-disabled.
+For the Undo feature, Tab Control keeps the addresses, positions, and Chrome
+session identifiers of tabs closed by the latest duplicate cleanup in Chrome's
+in-memory session storage. The identifiers let Chrome restore browsing history
+when it is still available. This one transaction is replaced by the next
+cleanup, removed after Undo, and cleared when Chrome restarts, the extension
+reloads, or the extension is disabled.
 
 The Recently closed view reads up to 10 entries from Chrome's browser-wide
 recently closed session history while the popup is open. Those entries can

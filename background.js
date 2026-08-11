@@ -2,16 +2,20 @@ import {
   claimUndoTransaction,
   createUndoTransaction,
   discardQueuedTab,
+  findClosedTabSessionId,
+  getClosedTabSessionIds,
   getRestorationOutcome,
   getUndoTransactionSummary,
   markTabClosed,
   markTabRestored,
   queueClosedTabs,
   reopenUndoTransaction,
+  UNDO_RESTORATION_METHOD,
   UNDO_TRANSACTION_STATE,
 } from "./undo-logic.mjs";
 
 const STORAGE_KEY = "latestDuplicateCleanup";
+const RECENT_SESSION_CAPTURE_LIMIT = 25;
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   handleMessage(message).then(
@@ -72,16 +76,27 @@ async function closeCleanupTabs(transactionId, tabs = []) {
 
   for (const tab of queuedTabs) {
     transaction = await getOpenTransaction(transactionId);
+    const previousSessions = await readRecentlyClosedSessions();
 
     try {
       await chrome.tabs.remove(tab.originalTabId);
-      transaction = markTabClosed(transaction, tab.originalTabId);
-      closedNow += 1;
     } catch {
       transaction = discardQueuedTab(transaction, tab.originalTabId);
       failed += 1;
+      await saveTransaction(transaction);
+      continue;
     }
 
+    const sessionId = await captureClosedTabSessionId(
+      tab,
+      previousSessions,
+    );
+    transaction = markTabClosed(
+      transaction,
+      tab.originalTabId,
+      sessionId,
+    );
+    closedNow += 1;
     await saveTransaction(transaction);
   }
 
@@ -121,11 +136,12 @@ async function restoreDuplicateCleanup(transactionId) {
 
   for (const tab of claimedTransaction.tabs) {
     try {
-      const restoredTab = await createRestoredTab(tab);
+      const restoration = await restoreTab(tab);
       claimedTransaction = markTabRestored(
         claimedTransaction,
         tab.originalTabId,
-        restoredTab.id,
+        restoration.restoredTabId,
+        restoration.method,
       );
       await saveTransaction(claimedTransaction);
     } catch (error) {
@@ -153,6 +169,35 @@ async function restoreDuplicateCleanup(transactionId) {
   };
 }
 
+async function restoreTab(snapshot) {
+  if (!snapshot.sessionId) {
+    return {
+      restoredTabId: (await createRestoredTab(snapshot)).id,
+      method: UNDO_RESTORATION_METHOD.URL,
+    };
+  }
+
+  try {
+    const session = await chrome.sessions.restore(snapshot.sessionId);
+
+    return {
+      restoredTabId: session?.tab?.id,
+      method: UNDO_RESTORATION_METHOD.SESSION,
+    };
+  } catch (sessionError) {
+    try {
+      return {
+        restoredTabId: (await createRestoredTab(snapshot)).id,
+        method: UNDO_RESTORATION_METHOD.URL,
+      };
+    } catch (createError) {
+      throw new Error(
+        `Chrome could not restore the saved tab session (${getErrorMessage(sessionError)}) or recreate its address (${getErrorMessage(createError)}).`,
+      );
+    }
+  }
+}
+
 async function createRestoredTab(snapshot) {
   const windowId = await findRestoreWindow(snapshot);
   const windowTabs = await chrome.tabs.query({ windowId });
@@ -168,6 +213,37 @@ async function createRestoredTab(snapshot) {
     pinned: snapshot.pinned,
     active: false,
   });
+}
+
+async function captureClosedTabSessionId(snapshot, previousSessions) {
+  if (!previousSessions) {
+    return null;
+  }
+
+  const currentSessions = await readRecentlyClosedSessions();
+
+  if (!currentSessions) {
+    return null;
+  }
+
+  return findClosedTabSessionId(
+    currentSessions,
+    snapshot,
+    getClosedTabSessionIds(previousSessions),
+  );
+}
+
+async function readRecentlyClosedSessions() {
+  try {
+    return await chrome.sessions.getRecentlyClosed({
+      maxResults: RECENT_SESSION_CAPTURE_LIMIT,
+    });
+  } catch (error) {
+    console.warn(
+      `Tab Control could not capture a closed tab's session history: ${getErrorMessage(error)}`,
+    );
+    return null;
+  }
 }
 
 async function findRestoreWindow(snapshot) {
