@@ -1,7 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Tab Control",
-  "description": "Control the clutter by cleaning and organizing tabs across Chrome windows.",
+  "name": "__MSG_extensionName__",
+  "description": "__MSG_extensionDescription__",
+  "default_locale": "en",
   "version": "3.0.4",
   "minimum_chrome_version": "102",
   "permissions": [
@@ -21,7 +22,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "Open Tab Control",
+    "default_title": "__MSG_actionDefaultTitle__",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",

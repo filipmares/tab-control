@@ -98,7 +98,7 @@ button {
 
 .header__issue {
   flex: 0 0 auto;
-  margin-left: auto;
+  margin-inline-start: auto;
   padding: var(--space-xs) 0;
   color: var(--muted);
   background: transparent;
@@ -172,7 +172,7 @@ h1 {
   min-height: 58px;
   padding: var(--space-sm);
   color: var(--ink);
-  text-align: left;
+  text-align: start;
   background: transparent;
   border: 0;
   cursor: pointer;
@@ -377,7 +377,7 @@ h1 {
   min-height: 72px;
   padding: var(--space-md) var(--space-sm);
   color: var(--ink);
-  text-align: left;
+  text-align: start;
   background: transparent;
   border: 0;
   cursor: pointer;
@@ -478,6 +478,8 @@ h1 {
 
 .review__keep-all,
 .review__close-all {
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 44px;
   padding: var(--space-sm) var(--space-md);
   color: var(--ink);
@@ -493,11 +495,10 @@ h1 {
 }
 
 .review__keep-all {
-  flex: 1 1 auto;
+  flex: 1 1 0;
 }
 
 .review__close-all {
-  flex: 0 0 auto;
   color: var(--red);
   background: transparent;
 }
@@ -630,7 +631,7 @@ h1 {
   min-height: 72px;
   padding: var(--space-md) var(--space-sm);
   color: var(--ink);
-  text-align: left;
+  text-align: start;
   background: transparent;
   border: 0;
   cursor: pointer;
@@ -673,7 +674,7 @@ h1 {
 }
 
 .recent-item__type::after {
-  margin-left: var(--space-xs);
+  margin-inline-start: var(--space-xs);
   content: "·";
 }
 
@@ -702,8 +703,15 @@ h1 {
 }
 
 .recent-item__restore::after {
-  margin-left: var(--space-xs);
+  display: inline-block;
+  margin-inline-start: var(--space-xs);
   content: "→";
+}
+
+[dir="rtl"] #stop-review svg,
+[dir="rtl"] #recent-back svg,
+[dir="rtl"] .recent-item__restore::after {
+  transform: scaleX(-1);
 }
 
 .recent-state {

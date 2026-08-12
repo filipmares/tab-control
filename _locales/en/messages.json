@@ -1,0 +1,436 @@
+{
+  "messageLocale": { "message": "en" },
+  "extensionName": { "message": "Tab Control" },
+  "extensionDescription": { "message": "Control the clutter by cleaning and organizing tabs across Chrome windows." },
+  "actionDefaultTitle": { "message": "Open Tab Control" },
+  "tagline": { "message": "Control the clutter." },
+  "reportIssue": { "message": "Report an issue" },
+  "tabActions": { "message": "Tab actions" },
+  "closeDuplicates": { "message": "Close duplicate tabs" },
+  "closeDuplicatesSummary": { "message": "Close exact matches; review similar URLs" },
+  "closeDuplicatesDescription": { "message": "Closes exact duplicate tabs and lets you review similar URLs" },
+  "organize": { "message": "Organize" },
+  "sortTabs": { "message": "Sort tabs by domain" },
+  "sortSummary": { "message": "Then order pages by title" },
+  "sortDescription": { "message": "Sorts unpinned tabs by domain, then orders each site's pages by title" },
+  "sortAriaDescription": { "message": "Sorts unpinned tabs by domain, then orders each site's pages by title. Pinned tabs stay in place." },
+  "groupTabs": { "message": "Group tabs by domain" },
+  "groupSummary": { "message": "Group sites with two or more tabs" },
+  "groupActionDescription": { "message": "Groups sites with two or more tabs by domain" },
+  "ungroupTabs": { "message": "Ungroup tabs" },
+  "ungroupSummary": { "message": "Remove same-domain groups only" },
+  "ungroupActionDescription": { "message": "Removes groups that contain tabs from a single domain" },
+  "gatherTabs": { "message": "Gather tabs here" },
+  "gatherSummary": { "message": "Move loose tabs from other windows" },
+  "gatherDescription": { "message": "Gather skips pinned and grouped tabs" },
+  "recentlyClosed": { "message": "Recently closed" },
+  "recentSummary": { "message": "Restore from Chrome-wide history" },
+  "recentDescription": { "message": "Shows Chrome-wide recently closed tabs and windows for restoration" },
+  "shortcutDuplicates": { "message": "D" },
+  "shortcutSort": { "message": "S" },
+  "shortcutGroup": { "message": "G" },
+  "shortcutGather": { "message": "A" },
+  "shortcutRecent": { "message": "R" },
+  "stopReview": { "message": "Stop reviewing similar tabs" },
+  "reviewSimilarTabs": { "message": "Review similar tabs" },
+  "backToActions": { "message": "Back to tab actions" },
+  "recentScope": { "message": "Across all Chrome windows" },
+  "refreshRecent": { "message": "Refresh recently closed" },
+  "recentListLabel": { "message": "Chrome-wide recently closed tabs and windows" },
+  "undo": { "message": "Undo" },
+  "checkingWindow": { "message": "Checking this window…" },
+  "couldNotReadWindow": {
+    "message": "Could not read this window. $ERROR$",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "loadingRecentlyClosed": { "message": "Loading recently closed items" },
+  "readingSessionHistory": { "message": "Reading Chrome's browser-wide session history." },
+  "recentUnavailable": { "message": "Recently closed is unavailable" },
+  "recentPermissionRequired": { "message": "Reload Tab Control from chrome://extensions. This view requires Chrome's sessions permission." },
+  "recentHistoryError": {
+    "message": "Chrome could not provide its session history. $ERROR$",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "restore": { "message": "Restore" },
+  "restoringItem": {
+    "message": "Restoring $ITEM_TYPE$",
+    "placeholders": { "item_type": { "content": "$1" } }
+  },
+  "chromeWillReopenItem": { "message": "Chrome will reopen this item." },
+  "itemRestored": {
+    "message": "$ITEM_TYPE$ restored",
+    "placeholders": { "item_type": { "content": "$1" } }
+  },
+  "recentListUpToDate": { "message": "The recently closed list is up to date." },
+  "couldNotRestoreItem": {
+    "message": "Could not restore $ITEM_TYPE$",
+    "placeholders": { "item_type": { "content": "$1" } }
+  },
+  "restoreRecentError": {
+    "message": "$ERROR$ The item may no longer be available; Chrome's list was refreshed.",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "findingExactDuplicates": { "message": "Finding exact duplicate pages…" },
+  "couldNotCloseDuplicates": {
+    "message": "Could not close duplicates. $ERROR$",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "chooseTabsEachGroup": { "message": "Choose which tabs to keep in each similar group." },
+  "chooseTabsThisGroup": { "message": "Choose which tabs to keep in this similar group." },
+  "unknownUrl": { "message": "Unknown URL" },
+  "keepThis": { "message": "Keep this" },
+  "stoppingReview": { "message": "Stopping review…" },
+  "reviewStoppedRefreshError": {
+    "message": "Review stopped, but this window could not be refreshed. $ERROR$",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "applyingDuplicateChoice": { "message": "Applying your duplicate choice…" },
+  "couldNotApplyChoice": {
+    "message": "Could not apply this choice. $ERROR$",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "keepingTabs": { "message": "Keeping these tabs…" },
+  "couldNotContinueReview": {
+    "message": "Could not continue the review. $ERROR$",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "closingTabs": { "message": "Closing these tabs…" },
+  "couldNotCloseTabs": {
+    "message": "Could not close these tabs. $ERROR$",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "filingTabs": { "message": "Filing tabs by domain…" },
+  "alreadySorted": { "message": "This window is already sorted by domain." },
+  "couldNotSortTabs": {
+    "message": "Could not sort tabs. $ERROR$",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "buildingDomainGroups": { "message": "Building domain groups…" },
+  "noGroupableDomains": { "message": "No ungrouped domains have multiple tabs." },
+  "couldNotGroupTabs": {
+    "message": "Could not group tabs. $ERROR$",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "removingDomainGroups": { "message": "Removing domain groups…" },
+  "noDomainGroups": { "message": "No same-domain tab groups found." },
+  "couldNotUngroupTabs": {
+    "message": "Could not ungroup tabs. $ERROR$",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "gatheringTabs": { "message": "Gathering tabs from other windows…" },
+  "noGatherableTabs": { "message": "No loose tabs found in other windows." },
+  "couldNotGatherTabs": {
+    "message": "Could not gather tabs. $ERROR$",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "couldNotRefreshWindow": {
+    "message": "Could not refresh this window. $ERROR$",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "cleanupTransactionUnavailable": { "message": "The duplicate cleanup transaction is unavailable." },
+  "restoringClosedTabs": { "message": "Restoring closed tabs…" },
+  "couldNotRestoreClosedTabs": {
+    "message": "Could not restore closed tabs. $ERROR$",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "windowSummary_one_one": {
+    "message": "$TAB_COUNT$ tab · $EXACT_COUNT$ exact · $POSSIBLE_COUNT$ possible · $SITE_COUNT$ site",
+    "placeholders": {
+      "tab_count": { "content": "$1" },
+      "exact_count": { "content": "$2" },
+      "possible_count": { "content": "$3" },
+      "site_count": { "content": "$4" }
+    }
+  },
+  "windowSummary_one_other": {
+    "message": "$TAB_COUNT$ tab · $EXACT_COUNT$ exact · $POSSIBLE_COUNT$ possible · $SITE_COUNT$ sites",
+    "placeholders": {
+      "tab_count": { "content": "$1" },
+      "exact_count": { "content": "$2" },
+      "possible_count": { "content": "$3" },
+      "site_count": { "content": "$4" }
+    }
+  },
+  "windowSummary_other_one": {
+    "message": "$TAB_COUNT$ tabs · $EXACT_COUNT$ exact · $POSSIBLE_COUNT$ possible · $SITE_COUNT$ site",
+    "placeholders": {
+      "tab_count": { "content": "$1" },
+      "exact_count": { "content": "$2" },
+      "possible_count": { "content": "$3" },
+      "site_count": { "content": "$4" }
+    }
+  },
+  "windowSummary_other_other": {
+    "message": "$TAB_COUNT$ tabs · $EXACT_COUNT$ exact · $POSSIBLE_COUNT$ possible · $SITE_COUNT$ sites",
+    "placeholders": {
+      "tab_count": { "content": "$1" },
+      "exact_count": { "content": "$2" },
+      "possible_count": { "content": "$3" },
+      "site_count": { "content": "$4" }
+    }
+  },
+  "noDuplicateAddresses": { "message": "No duplicate or similar tab addresses found." },
+  "couldNotCloseExactDuplicates": { "message": "Could not close the exact duplicate tabs." },
+  "exactDuplicatesNotClosed_one": {
+    "message": "$COUNT$ exact duplicate could not be closed.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "exactDuplicatesNotClosed_other": {
+    "message": "$COUNT$ exact duplicates could not be closed.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "duplicateCleanupComplete": { "message": "Duplicate cleanup complete." },
+  "keptAllReviewTabs_one": {
+    "message": "Kept all tabs from $COUNT$ possible match.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "keptAllReviewTabs_other": {
+    "message": "Kept all tabs from $COUNT$ possible matches.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "reviewStopped_one": {
+    "message": "Review stopped. $COUNT$ possible match left unchanged.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "reviewStopped_other": {
+    "message": "Review stopped. $COUNT$ possible matches left unchanged.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "tabsNotClosed_one": {
+    "message": "$COUNT$ tab could not be closed.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "tabsNotClosed_other": {
+    "message": "$COUNT$ tabs could not be closed.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "sortOutcome_one_one": {
+    "message": "Sorted $TAB_COUNT$ tab across $SITE_COUNT$ site.",
+    "placeholders": { "tab_count": { "content": "$1" }, "site_count": { "content": "$2" } }
+  },
+  "sortOutcome_one_other": {
+    "message": "Sorted $TAB_COUNT$ tab across $SITE_COUNT$ sites.",
+    "placeholders": { "tab_count": { "content": "$1" }, "site_count": { "content": "$2" } }
+  },
+  "sortOutcome_other_one": {
+    "message": "Sorted $TAB_COUNT$ tabs across $SITE_COUNT$ site.",
+    "placeholders": { "tab_count": { "content": "$1" }, "site_count": { "content": "$2" } }
+  },
+  "sortOutcome_other_other": {
+    "message": "Sorted $TAB_COUNT$ tabs across $SITE_COUNT$ sites.",
+    "placeholders": { "tab_count": { "content": "$1" }, "site_count": { "content": "$2" } }
+  },
+  "groupOutcome_one_one": {
+    "message": "Grouped $TAB_COUNT$ tab into $GROUP_COUNT$ domain group.",
+    "placeholders": { "tab_count": { "content": "$1" }, "group_count": { "content": "$2" } }
+  },
+  "groupOutcome_one_other": {
+    "message": "Grouped $TAB_COUNT$ tab into $GROUP_COUNT$ domain groups.",
+    "placeholders": { "tab_count": { "content": "$1" }, "group_count": { "content": "$2" } }
+  },
+  "groupOutcome_other_one": {
+    "message": "Grouped $TAB_COUNT$ tabs into $GROUP_COUNT$ domain group.",
+    "placeholders": { "tab_count": { "content": "$1" }, "group_count": { "content": "$2" } }
+  },
+  "groupOutcome_other_other": {
+    "message": "Grouped $TAB_COUNT$ tabs into $GROUP_COUNT$ domain groups.",
+    "placeholders": { "tab_count": { "content": "$1" }, "group_count": { "content": "$2" } }
+  },
+  "ungroupOutcome_one_one": {
+    "message": "Ungrouped $TAB_COUNT$ tab from $GROUP_COUNT$ domain group.",
+    "placeholders": { "tab_count": { "content": "$1" }, "group_count": { "content": "$2" } }
+  },
+  "ungroupOutcome_one_other": {
+    "message": "Ungrouped $TAB_COUNT$ tab from $GROUP_COUNT$ domain groups.",
+    "placeholders": { "tab_count": { "content": "$1" }, "group_count": { "content": "$2" } }
+  },
+  "ungroupOutcome_other_one": {
+    "message": "Ungrouped $TAB_COUNT$ tabs from $GROUP_COUNT$ domain group.",
+    "placeholders": { "tab_count": { "content": "$1" }, "group_count": { "content": "$2" } }
+  },
+  "ungroupOutcome_other_other": {
+    "message": "Ungrouped $TAB_COUNT$ tabs from $GROUP_COUNT$ domain groups.",
+    "placeholders": { "tab_count": { "content": "$1" }, "group_count": { "content": "$2" } }
+  },
+  "gatherOutcome_one_one": {
+    "message": "Gathered $TAB_COUNT$ tab from $WINDOW_COUNT$ other window.",
+    "placeholders": { "tab_count": { "content": "$1" }, "window_count": { "content": "$2" } }
+  },
+  "gatherOutcome_one_other": {
+    "message": "Gathered $TAB_COUNT$ tab from $WINDOW_COUNT$ other windows.",
+    "placeholders": { "tab_count": { "content": "$1" }, "window_count": { "content": "$2" } }
+  },
+  "gatherOutcome_other_one": {
+    "message": "Gathered $TAB_COUNT$ tabs from $WINDOW_COUNT$ other window.",
+    "placeholders": { "tab_count": { "content": "$1" }, "window_count": { "content": "$2" } }
+  },
+  "gatherOutcome_other_other": {
+    "message": "Gathered $TAB_COUNT$ tabs from $WINDOW_COUNT$ other windows.",
+    "placeholders": { "tab_count": { "content": "$1" }, "window_count": { "content": "$2" } }
+  },
+  "restorationCompleteHistory_one": {
+    "message": "Restored $COUNT$ tab. Browsing history was restored.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "restorationCompleteHistory_other": {
+    "message": "Restored $COUNT$ tabs. Browsing history was restored.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "restorationCompleteRecreated_one_one": {
+    "message": "Restored $RESTORED$ tab. $RECREATED$ tab reopened from saved address because Chrome no longer had browsing history.",
+    "placeholders": { "restored": { "content": "$1" }, "recreated": { "content": "$2" } }
+  },
+  "restorationCompleteRecreated_one_other": {
+    "message": "Restored $RESTORED$ tab. $RECREATED$ tabs reopened from saved addresses because Chrome no longer had browsing history.",
+    "placeholders": { "restored": { "content": "$1" }, "recreated": { "content": "$2" } }
+  },
+  "restorationCompleteRecreated_other_one": {
+    "message": "Restored $RESTORED$ tabs. $RECREATED$ tab reopened from saved address because Chrome no longer had browsing history.",
+    "placeholders": { "restored": { "content": "$1" }, "recreated": { "content": "$2" } }
+  },
+  "restorationCompleteRecreated_other_other": {
+    "message": "Restored $RESTORED$ tabs. $RECREATED$ tabs reopened from saved addresses because Chrome no longer had browsing history.",
+    "placeholders": { "restored": { "content": "$1" }, "recreated": { "content": "$2" } }
+  },
+  "restorationPartial_one": {
+    "message": "Restored $RESTORED$ of $TOTAL$ tab. $FAILED$ could not be restored.",
+    "placeholders": {
+      "restored": { "content": "$1" },
+      "total": { "content": "$2" },
+      "failed": { "content": "$3" }
+    }
+  },
+  "restorationPartial_other": {
+    "message": "Restored $RESTORED$ of $TOTAL$ tabs. $FAILED$ could not be restored.",
+    "placeholders": {
+      "restored": { "content": "$1" },
+      "total": { "content": "$2" },
+      "failed": { "content": "$3" }
+    }
+  },
+  "restorationPartialRecreated_one_one": {
+    "message": "Restored $RESTORED$ of $TOTAL$ tab. $FAILED$ could not be restored. $RECREATED$ restored tab reopened from saved address without browsing history.",
+    "placeholders": {
+      "restored": { "content": "$1" }, "total": { "content": "$2" },
+      "failed": { "content": "$3" }, "recreated": { "content": "$4" }
+    }
+  },
+  "restorationPartialRecreated_one_other": {
+    "message": "Restored $RESTORED$ of $TOTAL$ tab. $FAILED$ could not be restored. $RECREATED$ restored tabs reopened from saved addresses without browsing history.",
+    "placeholders": {
+      "restored": { "content": "$1" }, "total": { "content": "$2" },
+      "failed": { "content": "$3" }, "recreated": { "content": "$4" }
+    }
+  },
+  "restorationPartialRecreated_other_one": {
+    "message": "Restored $RESTORED$ of $TOTAL$ tabs. $FAILED$ could not be restored. $RECREATED$ restored tab reopened from saved address without browsing history.",
+    "placeholders": {
+      "restored": { "content": "$1" }, "total": { "content": "$2" },
+      "failed": { "content": "$3" }, "recreated": { "content": "$4" }
+    }
+  },
+  "restorationPartialRecreated_other_other": {
+    "message": "Restored $RESTORED$ of $TOTAL$ tabs. $FAILED$ could not be restored. $RECREATED$ restored tabs reopened from saved addresses without browsing history.",
+    "placeholders": {
+      "restored": { "content": "$1" }, "total": { "content": "$2" },
+      "failed": { "content": "$3" }, "recreated": { "content": "$4" }
+    }
+  },
+  "restorationFailed_one": {
+    "message": "Could not restore $COUNT$ closed tab.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "restorationFailed_other": {
+    "message": "Could not restore $COUNT$ closed tabs.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "restorationFailedWithError_one": {
+    "message": "Could not restore $COUNT$ closed tab. $ERROR$",
+    "placeholders": { "count": { "content": "$1" }, "error": { "content": "$2" } }
+  },
+  "restorationFailedWithError_other": {
+    "message": "Could not restore $COUNT$ closed tabs. $ERROR$",
+    "placeholders": { "count": { "content": "$1" }, "error": { "content": "$2" } }
+  },
+  "undoUnavailable": { "message": "Undo is no longer available." },
+  "closedTabs_one": {
+    "message": "Closed $COUNT$ tab",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "closedTabs_other": {
+    "message": "Closed $COUNT$ tabs",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "undoClosedTabs_one": {
+    "message": "Undo the latest duplicate cleanup and restore $COUNT$ tab",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "undoClosedTabs_other": {
+    "message": "Undo the latest duplicate cleanup and restore $COUNT$ tabs",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "reviewProgress": {
+    "message": "Match $CURRENT$ of $TOTAL$",
+    "placeholders": { "current": { "content": "$1" }, "total": { "content": "$2" } }
+  },
+  "keepBothTabs": { "message": "Keep both tabs" },
+  "keepAllMatchTabs": { "message": "Keep all tabs in this match" },
+  "closeBothTabs": { "message": "Close both tabs" },
+  "closeAllMatchTabs": { "message": "Close all tabs in this match" },
+  "untitledTab": { "message": "Untitled tab" },
+  "untitledTabLowercase": { "message": "untitled tab" },
+  "reviewBadgeActive": { "message": "Active" },
+  "reviewBadgePinned": { "message": "Pinned" },
+  "reviewBadgeActivePinned": { "message": "Active · Pinned" },
+  "keepReviewTab": {
+    "message": "Keep $TITLE$, $URL$, and close the other matching tabs",
+    "placeholders": { "title": { "content": "$1" }, "url": { "content": "$2" } }
+  },
+  "keepReviewTabActive": {
+    "message": "Keep $TITLE$, $URL$, active, and close the other matching tabs",
+    "placeholders": { "title": { "content": "$1" }, "url": { "content": "$2" } }
+  },
+  "keepReviewTabPinned": {
+    "message": "Keep $TITLE$, $URL$, pinned, and close the other matching tabs",
+    "placeholders": { "title": { "content": "$1" }, "url": { "content": "$2" } }
+  },
+  "keepReviewTabActivePinned": {
+    "message": "Keep $TITLE$, $URL$, active and pinned, and close the other matching tabs",
+    "placeholders": { "title": { "content": "$1" }, "url": { "content": "$2" } }
+  },
+  "addressUnavailable": { "message": "Address unavailable" },
+  "localFile": { "message": "Local file" },
+  "windowKind": { "message": "Window" },
+  "tabKind": { "message": "Tab" },
+  "recentWindowContext": {
+    "message": "$TAB_COUNT$ · $TITLES$",
+    "placeholders": { "tab_count": { "content": "$1" }, "titles": { "content": "$2" } }
+  },
+  "nothingRecentlyClosed": { "message": "Nothing recently closed" },
+  "recentListEmpty": { "message": "Close a tab or window in Chrome, then refresh this view." },
+  "recentListEmptyAfterRestore": {
+    "message": "$NOTICE$ Chrome's browser-wide list is now empty.",
+    "placeholders": { "notice": { "content": "$1" } }
+  },
+  "restoreTabLabel": {
+    "message": "Restore tab: $TITLE$, $DOMAIN$",
+    "placeholders": { "title": { "content": "$1" }, "domain": { "content": "$2" } }
+  },
+  "recentlyClosedWindow": { "message": "Recently closed window" },
+  "tabCount_one": {
+    "message": "$COUNT$ tab",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "tabCount_other": {
+    "message": "$COUNT$ tabs",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "restoreWindowLabel": {
+    "message": "Restore window with $TAB_COUNT$",
+    "placeholders": { "tab_count": { "content": "$1" } }
+  },
+  "restoreWindowLabelWithTitles": {
+    "message": "Restore window with $TAB_COUNT$: $TITLES$",
+    "placeholders": { "tab_count": { "content": "$1" }, "titles": { "content": "$2" } }
+  }
+}

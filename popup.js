@@ -52,12 +52,19 @@ import {
 } from "./popup-control-state.mjs";
 import { createChromeAdapter } from "./chrome-adapter.mjs";
 import { createTabEditRetry } from "./tab-edit-retry.mjs";
+import {
+  createMessage,
+  createTranslator,
+  localizeDocument,
+} from "./i18n.mjs";
 
 const LIVE_SUMMARY_REFRESH_DELAY = 100;
 const ISSUE_TRACKER_URL = "https://github.com/filipmares/tab-control/issues/new";
 
 const browser = createChromeAdapter(chrome);
 const runWithTabEditRetry = createTabEditRetry();
+const translate = createTranslator(chrome.i18n);
+localizeDocument(document, translate, translate.locale);
 
 const elements = {
   appHeader: document.querySelector("#app-header"),
@@ -153,7 +160,10 @@ async function initialize() {
     updateUndoTransaction(undoTransaction);
     setStatus(formatSummary(summary, state.partialGroupCount));
   } catch (error) {
-    setStatus(`Could not read this window. ${getErrorMessage(error)}`, "error");
+    setStatus(
+      createMessage("couldNotReadWindow", [getErrorMessage(error)]),
+      "error",
+    );
   }
 }
 
@@ -178,13 +188,16 @@ async function showActionsView() {
   elements.recentView.hidden = true;
   elements.actions.hidden = false;
   elements.status.hidden = false;
-  setBusy(true, "Checking this window…");
+  setBusy(true, "checkingWindow");
 
   try {
     const summary = await refreshSummary();
     setStatus(formatSummary(summary, state.partialGroupCount));
   } catch (error) {
-    setStatus(`Could not read this window. ${getErrorMessage(error)}`, "error");
+    setStatus(
+      createMessage("couldNotReadWindow", [getErrorMessage(error)]),
+      "error",
+    );
   } finally {
     setBusy(false);
     elements.openRecentlyClosed.focus();
@@ -197,8 +210,8 @@ async function loadRecentlyClosed(notice = null) {
   elements.recentList.replaceChildren();
   elements.recentList.hidden = true;
   showRecentState(
-    "Loading recently closed items",
-    "Reading Chrome's browser-wide session history.",
+    "loadingRecentlyClosed",
+    "readingSessionHistory",
     "busy",
   );
   syncRecentControlStates();
@@ -207,8 +220,8 @@ async function loadRecentlyClosed(notice = null) {
     state.recentLoading = false;
     elements.recentView.removeAttribute("aria-busy");
     showRecentState(
-      "Recently closed is unavailable",
-      "Reload Tab Control from chrome://extensions. This view requires Chrome's sessions permission.",
+      "recentUnavailable",
+      "recentPermissionRequired",
       "unavailable",
     );
     syncRecentControlStates();
@@ -232,8 +245,8 @@ async function loadRecentlyClosed(notice = null) {
     }
   } catch (error) {
     showRecentState(
-      "Recently closed is unavailable",
-      `Chrome could not provide its session history. ${getErrorMessage(error)}`,
+      "recentUnavailable",
+      createMessage("recentHistoryError", [getErrorMessage(error)]),
       "unavailable",
     );
   } finally {
@@ -261,22 +274,22 @@ function renderRecentlyClosedItems(items) {
     button.type = "button";
     button.className = `recent-item recent-item--${item.kind}`;
     button.dataset.sessionId = item.sessionId;
-    button.setAttribute("aria-label", item.ariaLabel);
+    button.setAttribute("aria-label", translate(item.ariaLabel));
     button.addEventListener("click", () => restoreRecentlyClosedItem(item));
 
     copy.className = "recent-item__copy";
     meta.className = "recent-item__meta";
     type.className = "recent-item__type";
-    type.textContent = presentation.typeLabel;
+    type.textContent = translate(presentation.typeLabel);
     title.className = "recent-item__title";
-    title.textContent = item.title;
+    title.textContent = resolveDisplayValue(item.title);
     context.className = "recent-item__context";
-    context.textContent = presentation.context;
+    context.textContent = resolveDisplayValue(presentation.context);
     if (presentation.contextTitle) {
       context.title = presentation.contextTitle;
     }
     restore.className = "recent-item__restore";
-    restore.textContent = "Restore";
+    restore.textContent = translate("restore");
     restore.setAttribute("aria-hidden", "true");
 
     meta.append(type, context);
@@ -296,8 +309,8 @@ async function restoreRecentlyClosedItem(item) {
 
   state.recentRestoringId = item.sessionId;
   showRecentState(
-    `Restoring ${item.kind}`,
-    "Chrome will reopen this item.",
+    createMessage("restoringItem", [getRecentKindLabel(item.kind)]),
+    "chromeWillReopenItem",
     "busy",
   );
   syncRecentControlStates();
@@ -306,15 +319,17 @@ async function restoreRecentlyClosedItem(item) {
     await browser.restoreSession(item.sessionId);
     state.recentUnavailableIds.add(item.sessionId);
     await loadRecentlyClosed({
-      title: `${getRecentKindLabel(item.kind)} restored`,
-      message: "The recently closed list is up to date.",
+      title: createMessage("itemRestored", [getRecentKindLabel(item.kind)]),
+      message: createMessage("recentListUpToDate"),
       tone: "success",
     });
   } catch (error) {
     state.recentUnavailableIds.add(item.sessionId);
     await loadRecentlyClosed({
-      title: `Could not restore ${item.kind}`,
-      message: `${getErrorMessage(error)} The item may no longer be available; Chrome's list was refreshed.`,
+      title: createMessage("couldNotRestoreItem", [
+        getRecentKindLabel(item.kind),
+      ]),
+      message: createMessage("restoreRecentError", [getErrorMessage(error)]),
       tone: "error",
     });
   } finally {
@@ -334,8 +349,8 @@ function refreshOpenRecentlyClosedView() {
 }
 
 function showRecentState(title, message, tone = "neutral") {
-  elements.recentStateTitle.textContent = title;
-  elements.recentStateMessage.textContent = message;
+  elements.recentStateTitle.textContent = translate(title);
+  elements.recentStateMessage.textContent = translate(message);
   elements.recentState.dataset.tone = tone;
   elements.recentState.hidden = false;
 }
@@ -354,7 +369,7 @@ async function closeDuplicateTabs() {
     return;
   }
 
-  setBusy(true, "Finding exact duplicate pages…");
+  setBusy(true, "findingExactDuplicates");
 
   try {
     const tabs = await browser.queryCurrentWindowTabs();
@@ -392,7 +407,10 @@ async function closeDuplicateTabs() {
     });
     setStatus(outcome.message, outcome.tone);
   } catch (error) {
-    setStatus(`Could not close duplicates. ${getErrorMessage(error)}`, "error");
+    setStatus(
+      createMessage("couldNotCloseDuplicates", [getErrorMessage(error)]),
+      "error",
+    );
   } finally {
     setBusy(false);
   }
@@ -412,7 +430,7 @@ function startPartialReview(groups, exactClosedCount) {
   syncButtonStates();
 
   setStatus(
-    "Choose which tabs to keep in each similar group.",
+    "chooseTabsEachGroup",
   );
 }
 
@@ -423,12 +441,14 @@ function renderReviewGroup() {
     state.reviewIndex,
     state.reviewGroups.length,
   );
-  elements.reviewProgress.textContent = labels.progress;
+  elements.reviewProgress.textContent = translate(labels.progress);
   elements.reviewTabs.replaceChildren();
-  elements.keepAllReviewTabs.textContent = labels.keepAllLabel;
-  elements.closeAllReviewTabs.textContent = labels.closeAllLabel;
+  elements.keepAllReviewTabs.textContent = translate(labels.keepAllLabel);
+  elements.closeAllReviewTabs.textContent = translate(labels.closeAllLabel);
 
-  const fullUrls = group.map(getTabUrlValue);
+  const fullUrls = group.map((tab) =>
+    getTabUrlValue(tab) || translate("unknownUrl")
+  );
   const compactUrls = fullUrls.map(formatCompactUrl);
 
   for (const [tabIndex, tab] of group.entries()) {
@@ -443,25 +463,25 @@ function renderReviewGroup() {
     button.type = "button";
     button.className = "review-tab";
     button.dataset.tabId = String(tab.id);
-    button.setAttribute("aria-label", presentation.ariaLabel);
+    button.setAttribute("aria-label", translate(presentation.ariaLabel));
     button.addEventListener("click", () => keepOnlyReviewTab(tab.id));
 
     copy.className = "review-tab__copy";
     titleRow.className = "review-tab__title-row";
     title.className = "review-tab__title";
-    title.textContent = presentation.title;
+    title.textContent = resolveDisplayValue(presentation.title);
     url.className = "review-tab__url";
     url.title = fullUrls[tabIndex];
     appendHighlightedUrl(url, compactUrls, tabIndex);
     choice.className = "review-tab__choice";
-    choice.textContent = "Keep this";
+    choice.textContent = translate("keepThis");
 
     titleRow.append(title);
 
     if (presentation.badge) {
       const badge = document.createElement("span");
       badge.className = "review-tab__badge";
-      badge.textContent = presentation.badge;
+      badge.textContent = translate(presentation.badge);
       titleRow.append(badge);
     }
 
@@ -482,17 +502,16 @@ async function stopPartialReview() {
   }
 
   const remainingCount = state.reviewGroups.length - state.reviewIndex;
-  setBusy(true, "Stopping review…");
+  setBusy(true, "stoppingReview");
   leaveReview();
 
   try {
     await refreshSummary();
     setStatus(formatReviewStopped(remainingCount));
   } catch (error) {
-    setStatus(
-      `Review stopped, but this window could not be refreshed. ${getErrorMessage(error)}`,
-      "error",
-    );
+    setStatus(createMessage("reviewStoppedRefreshError", [
+      getErrorMessage(error),
+    ]), "error");
   } finally {
     setBusy(false);
     elements.closeDuplicates.focus();
@@ -507,7 +526,7 @@ async function keepOnlyReviewTab(tabId) {
   const group = state.reviewGroups[state.reviewIndex];
   const tabIdsToClose = getReviewTabIdsToClose(group, tabId);
 
-  setBusy(true, "Applying your duplicate choice…");
+  setBusy(true, "applyingDuplicateChoice");
 
   try {
     if (tabIdsToClose.length > 0) {
@@ -517,13 +536,16 @@ async function keepOnlyReviewTab(tabId) {
       state.reviewClosedCount += result.closedNow;
 
       if (result.failed > 0) {
-        throw new Error(formatUnclosedTabs(result.failed));
+        throw new Error(translate(formatUnclosedTabs(result.failed)));
       }
     }
 
     await advanceReview();
   } catch (error) {
-    setStatus(`Could not apply this choice. ${getErrorMessage(error)}`, "error");
+    setStatus(
+      createMessage("couldNotApplyChoice", [getErrorMessage(error)]),
+      "error",
+    );
   } finally {
     setBusy(false);
   }
@@ -534,12 +556,15 @@ async function keepAllReviewTabs() {
     return;
   }
 
-  setBusy(true, "Keeping these tabs…");
+  setBusy(true, "keepingTabs");
 
   try {
     await advanceReview();
   } catch (error) {
-    setStatus(`Could not continue the review. ${getErrorMessage(error)}`, "error");
+    setStatus(
+      createMessage("couldNotContinueReview", [getErrorMessage(error)]),
+      "error",
+    );
   } finally {
     setBusy(false);
   }
@@ -553,7 +578,7 @@ async function closeAllReviewTabs() {
   const group = state.reviewGroups[state.reviewIndex];
   const tabIdsToClose = getReviewTabIdsToClose(group);
 
-  setBusy(true, "Closing these tabs…");
+  setBusy(true, "closingTabs");
 
   try {
     if (tabIdsToClose.length > 0) {
@@ -563,13 +588,16 @@ async function closeAllReviewTabs() {
       state.reviewClosedCount += result.closedNow;
 
       if (result.failed > 0) {
-        throw new Error(formatUnclosedTabs(result.failed));
+        throw new Error(translate(formatUnclosedTabs(result.failed)));
       }
     }
 
     await advanceReview();
   } catch (error) {
-    setStatus(`Could not close these tabs. ${getErrorMessage(error)}`, "error");
+    setStatus(
+      createMessage("couldNotCloseTabs", [getErrorMessage(error)]),
+      "error",
+    );
   } finally {
     setBusy(false);
   }
@@ -580,7 +608,7 @@ async function advanceReview() {
 
   if (state.reviewIndex < state.reviewGroups.length) {
     renderReviewGroup();
-    setStatus("Choose which tabs to keep in this similar group.");
+    setStatus("chooseTabsThisGroup");
     return;
   }
 
@@ -607,7 +635,7 @@ async function sortTabsByDomain() {
     return;
   }
 
-  setBusy(true, "Filing tabs by domain…");
+  setBusy(true, "filingTabs");
 
   try {
     const tabs = await browser.queryCurrentWindowTabs();
@@ -615,7 +643,7 @@ async function sortTabsByDomain() {
     const sortedIds = getSortedTabIds(tabs);
 
     if (isSameTabOrder(currentIds, sortedIds)) {
-      setStatus("This window is already sorted by domain.");
+      setStatus("alreadySorted");
       return;
     }
 
@@ -626,7 +654,10 @@ async function sortTabsByDomain() {
     const summary = await refreshSummary();
     setStatus(formatSortOutcome(summary), "success");
   } catch (error) {
-    setStatus(`Could not sort tabs. ${getErrorMessage(error)}`, "error");
+    setStatus(
+      createMessage("couldNotSortTabs", [getErrorMessage(error)]),
+      "error",
+    );
   } finally {
     setBusy(false);
   }
@@ -637,14 +668,14 @@ async function groupTabsByDomain() {
     return;
   }
 
-  setBusy(true, "Building domain groups…");
+  setBusy(true, "buildingDomainGroups");
 
   try {
     const tabs = await browser.queryCurrentWindowTabs();
     const groupingPlan = getDomainGroupingPlan(tabs);
 
     if (groupingPlan.length === 0) {
-      setStatus("No ungrouped domains have multiple tabs.");
+      setStatus("noGroupableDomains");
       return;
     }
 
@@ -670,7 +701,10 @@ async function groupTabsByDomain() {
       "success",
     );
   } catch (error) {
-    setStatus(`Could not group tabs. ${getErrorMessage(error)}`, "error");
+    setStatus(
+      createMessage("couldNotGroupTabs", [getErrorMessage(error)]),
+      "error",
+    );
   } finally {
     setBusy(false);
   }
@@ -687,14 +721,14 @@ async function ungroupDomainGroups() {
     return;
   }
 
-  setBusy(true, "Removing domain groups…");
+  setBusy(true, "removingDomainGroups");
 
   try {
     const tabs = await browser.queryCurrentWindowTabs();
     const ungroupingPlan = getDomainUngroupingPlan(tabs);
 
     if (ungroupingPlan.length === 0) {
-      setStatus("No same-domain tab groups found.");
+      setStatus("noDomainGroups");
       return;
     }
 
@@ -707,7 +741,10 @@ async function ungroupDomainGroups() {
       "success",
     );
   } catch (error) {
-    setStatus(`Could not ungroup tabs. ${getErrorMessage(error)}`, "error");
+    setStatus(
+      createMessage("couldNotUngroupTabs", [getErrorMessage(error)]),
+      "error",
+    );
   } finally {
     setBusy(false);
   }
@@ -718,7 +755,7 @@ async function gatherTabsHere() {
     return;
   }
 
-  setBusy(true, "Gathering tabs from other windows…");
+  setBusy(true, "gatheringTabs");
 
   try {
     const [currentWindow, windows] = await Promise.all([
@@ -728,7 +765,7 @@ async function gatherTabsHere() {
     const gatherPlan = getGatherTabsPlan(windows, currentWindow);
 
     if (gatherPlan.length === 0) {
-      setStatus("No loose tabs found in other windows.");
+      setStatus("noGatherableTabs");
       return;
     }
 
@@ -747,7 +784,10 @@ async function gatherTabsHere() {
       "success",
     );
   } catch (error) {
-    setStatus(`Could not gather tabs. ${getErrorMessage(error)}`, "error");
+    setStatus(
+      createMessage("couldNotGatherTabs", [getErrorMessage(error)]),
+      "error",
+    );
   } finally {
     setBusy(false);
   }
@@ -775,10 +815,9 @@ async function refreshLiveSummary() {
     setStatus(formatSummary(summary, state.partialGroupCount));
   } catch (error) {
     if (generation === liveSummaryRefreshGeneration && canRefreshLiveSummary()) {
-      setStatus(
-        `Could not refresh this window. ${getErrorMessage(error)}`,
-        "error",
-      );
+      setStatus(createMessage("couldNotRefreshWindow", [
+        getErrorMessage(error),
+      ]), "error");
     }
   }
 }
@@ -833,7 +872,7 @@ function updateSummaryFromTabs(tabs) {
 
 async function closeTabsForCleanup(tabs) {
   if (!state.undoTransaction?.id) {
-    throw new Error("The duplicate cleanup transaction is unavailable.");
+    throw new Error(translate("cleanupTransactionUnavailable"));
   }
 
   const result = await browser.sendBackgroundMessage({
@@ -863,7 +902,7 @@ async function undoDuplicateCleanup() {
     leaveReview();
   }
 
-  setBusy(true, "Restoring closed tabs…");
+  setBusy(true, "restoringClosedTabs");
 
   try {
     const result = await browser.sendBackgroundMessage({
@@ -874,10 +913,9 @@ async function undoDuplicateCleanup() {
     showRestorationOutcome(result.outcome);
     await refreshSummary();
   } catch (error) {
-    setStatus(
-      `Could not restore closed tabs. ${getErrorMessage(error)}`,
-      "error",
-    );
+    setStatus(createMessage("couldNotRestoreClosedTabs", [
+      getErrorMessage(error),
+    ]), "error");
   } finally {
     setBusy(false);
   }
@@ -914,12 +952,16 @@ function syncButtonStates() {
   elements.closeDuplicates.disabled = controls.closeDuplicatesDisabled;
   elements.sortByDomain.disabled = controls.sortByDomainDisabled;
   elements.domainGroupToggle.disabled = controls.domainGroupToggleDisabled;
-  elements.domainGroupTitle.textContent = controls.domainGroupTitle;
-  elements.domainGroupDescription.textContent = controls.domainGroupDescription;
-  elements.domainGroupToggle.title = controls.domainGroupActionDescription;
+  elements.domainGroupTitle.textContent = translate(controls.domainGroupTitle);
+  elements.domainGroupDescription.textContent = translate(
+    controls.domainGroupDescription,
+  );
+  elements.domainGroupToggle.title = translate(
+    controls.domainGroupActionDescription,
+  );
   elements.domainGroupToggle.setAttribute(
     "aria-description",
-    controls.domainGroupActionDescription,
+    translate(controls.domainGroupActionDescription),
   );
   elements.gatherTabsHere.disabled = controls.gatherTabsHereDisabled;
   elements.openRecentlyClosed.disabled = controls.openRecentlyClosedDisabled;
@@ -997,7 +1039,7 @@ function appendHighlightedUrl(element, values, valueIndex) {
 }
 
 function setStatus(message, tone = "neutral") {
-  elements.statusText.textContent = message;
+  elements.statusText.textContent = translate(message);
   elements.status.dataset.tone = tone;
 }
 
@@ -1016,8 +1058,12 @@ function syncUndoState() {
     return;
   }
 
-  elements.undoText.textContent = undo.text;
-  elements.undoCleanup.setAttribute("aria-label", undo.ariaLabel);
+  elements.undoText.textContent = translate(undo.text);
+  elements.undoCleanup.setAttribute("aria-label", translate(undo.ariaLabel));
+}
+
+function resolveDisplayValue(value) {
+  return typeof value === "string" ? value : translate(value);
 }
 
 function openIssueTracker() {

@@ -1,3 +1,5 @@
+import { createMessage, createPluralMessage } from "./i18n.mjs";
+
 const GROUP_COLORS = [
   "blue",
   "red",
@@ -12,12 +14,17 @@ const GROUP_COLORS = [
 
 const GROUP_TITLE_LIMIT = 24;
 
-export function pluralize(word, count) {
-  return count === 1 ? word : `${word}s`;
-}
-
 export function formatSummary(summary, partialGroupCount) {
-  return `${summary.tabCount} ${pluralize("tab", summary.tabCount)} · ${summary.duplicateCount} exact · ${partialGroupCount} possible · ${summary.domainCount} ${pluralize("site", summary.domainCount)}`;
+  return createPluralMessage(
+    "windowSummary",
+    [summary.tabCount, summary.domainCount],
+    [
+      summary.tabCount,
+      summary.duplicateCount,
+      partialGroupCount,
+      summary.domainCount,
+    ],
+  );
 }
 
 export function formatGroupTitle(label) {
@@ -37,7 +44,7 @@ export function getGroupColor(key) {
 }
 
 export function getTabUrlValue(tab) {
-  return tab.pendingUrl || tab.url || "Unknown URL";
+  return tab.pendingUrl || tab.url || "";
 }
 
 export function getErrorMessage(error) {
@@ -51,100 +58,136 @@ export function formatDuplicateCleanupOutcome({
 }) {
   if (duplicateCount === 0) {
     return {
-      message: "No duplicate or similar tab addresses found.",
+      message: createMessage("noDuplicateAddresses"),
       tone: "neutral",
     };
   }
 
   if (closedNow === 0) {
     return {
-      message: "Could not close the exact duplicate tabs.",
+      message: createMessage("couldNotCloseExactDuplicates"),
       tone: "error",
     };
   }
 
   if (failed > 0) {
     return {
-      message:
-        `${failed} exact ${pluralize("duplicate", failed)} could not be closed.`,
+      message: createPluralMessage("exactDuplicatesNotClosed", failed),
       tone: "error",
     };
   }
 
-  return { message: "Duplicate cleanup complete.", tone: "success" };
+  return { message: createMessage("duplicateCleanupComplete"), tone: "success" };
 }
 
 export function formatReviewOutcome({ closedCount, reviewedCount }) {
   if (closedCount > 0) {
-    return { message: "Duplicate cleanup complete.", tone: "success" };
+    return {
+      message: createMessage("duplicateCleanupComplete"),
+      tone: "success",
+    };
   }
 
   return {
-    message:
-      `Kept all tabs from ${reviewedCount} possible ${pluralize("match", reviewedCount)}.`,
+    message: createPluralMessage("keptAllReviewTabs", reviewedCount),
     tone: "neutral",
   };
 }
 
 export function formatReviewStopped(remainingCount) {
-  return `Review stopped. ${remainingCount} possible ${pluralize("match", remainingCount)} left unchanged.`;
+  return createPluralMessage("reviewStopped", remainingCount);
 }
 
 export function formatUnclosedTabs(failedCount) {
-  return `${failedCount} ${pluralize("tab", failedCount)} could not be closed.`;
+  return createPluralMessage("tabsNotClosed", failedCount);
 }
 
 export function formatSortOutcome(summary) {
-  return `Sorted ${summary.tabCount} ${pluralize("tab", summary.tabCount)} across ${summary.domainCount} ${pluralize("site", summary.domainCount)}.`;
+  return createPluralMessage(
+    "sortOutcome",
+    [summary.tabCount, summary.domainCount],
+    [summary.tabCount, summary.domainCount],
+  );
 }
 
 export function formatGroupOutcome(groupedTabCount, groupCount) {
-  return `Grouped ${groupedTabCount} ${pluralize("tab", groupedTabCount)} into ${groupCount} domain ${pluralize("group", groupCount)}.`;
+  return createPluralMessage(
+    "groupOutcome",
+    [groupedTabCount, groupCount],
+    [groupedTabCount, groupCount],
+  );
 }
 
 export function formatUngroupOutcome(ungroupedTabCount, groupCount) {
-  return `Ungrouped ${ungroupedTabCount} ${pluralize("tab", ungroupedTabCount)} from ${groupCount} domain ${pluralize("group", groupCount)}.`;
+  return createPluralMessage(
+    "ungroupOutcome",
+    [ungroupedTabCount, groupCount],
+    [ungroupedTabCount, groupCount],
+  );
 }
 
 export function formatGatherOutcome(gatheredTabCount, windowCount) {
-  return `Gathered ${gatheredTabCount} ${pluralize("tab", gatheredTabCount)} from ${windowCount} other ${pluralize("window", windowCount)}.`;
+  return createPluralMessage(
+    "gatherOutcome",
+    [gatheredTabCount, windowCount],
+    [gatheredTabCount, windowCount],
+  );
 }
 
 export function formatRestorationOutcome(outcome) {
   switch (outcome.status) {
     case "restored": {
-      const detail = outcome.recreated > 0
-        ? ` ${outcome.recreated} ${pluralize("tab", outcome.recreated)} reopened from saved ${pluralizeAddress(outcome.recreated)} because Chrome no longer had browsing history.`
-        : " Browsing history was restored.";
-
       return {
-        message: `Restored ${outcome.restored} ${pluralize("tab", outcome.restored)}.${detail}`,
+        message: outcome.recreated > 0
+          ? createPluralMessage(
+            "restorationCompleteRecreated",
+            [outcome.restored, outcome.recreated],
+            [outcome.restored, outcome.recreated],
+          )
+          : createPluralMessage(
+            "restorationCompleteHistory",
+            outcome.restored,
+          ),
         tone: "success",
       };
     }
     case "partial": {
-      const detail = outcome.recreated > 0
-        ? ` ${outcome.recreated} restored ${pluralize("tab", outcome.recreated)} reopened from saved ${pluralizeAddress(outcome.recreated)} without browsing history.`
-        : "";
-
       return {
-        message: `Restored ${outcome.restored} of ${outcome.total} tabs. ${outcome.failed} could not be restored.${detail}`,
+        message: outcome.recreated > 0
+          ? createPluralMessage(
+            "restorationPartialRecreated",
+            [outcome.total, outcome.recreated],
+            [
+              outcome.restored,
+              outcome.total,
+              outcome.failed,
+              outcome.recreated,
+            ],
+          )
+          : createPluralMessage(
+            "restorationPartial",
+            outcome.total,
+            [outcome.restored, outcome.total, outcome.failed],
+          ),
         tone: "error",
       };
     }
     case "failed": {
-      const detail = outcome.error ? ` ${outcome.error}` : "";
-
       return {
-        message: `Could not restore ${outcome.total} closed ${pluralize("tab", outcome.total)}.${detail}`,
+        message: outcome.error
+          ? createPluralMessage(
+            "restorationFailedWithError",
+            outcome.total,
+            [outcome.total, outcome.error],
+          )
+          : createPluralMessage("restorationFailed", outcome.total),
         tone: "error",
       };
     }
     default:
-      return { message: "Undo is no longer available.", tone: "error" };
+      return {
+        message: createMessage("undoUnavailable"),
+        tone: "error",
+      };
   }
-}
-
-function pluralizeAddress(count) {
-  return count === 1 ? "address" : "addresses";
 }

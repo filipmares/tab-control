@@ -1,15 +1,15 @@
-import { pluralize } from "./popup-format.mjs";
+import { createPluralMessage } from "./i18n.mjs";
 
 const GROUP_ACTION_COPY = {
   group: {
-    title: "Group tabs by domain",
-    description: "Group sites with two or more tabs",
-    actionDescription: "Groups sites with two or more tabs by domain",
+    title: "groupTabs",
+    description: "groupSummary",
+    actionDescription: "groupActionDescription",
   },
   ungroup: {
-    title: "Ungroup tabs",
-    description: "Remove same-domain groups only",
-    actionDescription: "Removes groups that contain tabs from a single domain",
+    title: "ungroupTabs",
+    description: "ungroupSummary",
+    actionDescription: "ungroupActionDescription",
   },
 };
 
@@ -61,8 +61,7 @@ export function getUndoControlState(state) {
   return {
     hidden: false,
     disabled: state.busy,
-    text: `Closed ${count} ${pluralize("tab", count)}`,
-    ariaLabel:
-      `Undo the latest duplicate cleanup and restore ${count} ${pluralize("tab", count)}`,
+    text: createPluralMessage("closedTabs", count),
+    ariaLabel: createPluralMessage("undoClosedTabs", count),
   };
 }

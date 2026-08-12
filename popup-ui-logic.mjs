@@ -1,3 +1,5 @@
+import { createMessage } from "./i18n.mjs";
+
 const ACTION_SHORTCUTS = new Map([
   ["d", "close-duplicates"],
   ["s", "sort-by-domain"],
@@ -116,31 +118,28 @@ export function getReviewGroupLabels(group, groupIndex, groupCount) {
   const isPair = group.length === 2;
 
   return {
-    progress: `Match ${groupIndex + 1} of ${groupCount}`,
-    keepAllLabel: isPair ? "Keep both tabs" : "Keep all tabs in this match",
-    closeAllLabel: isPair ? "Close both tabs" : "Close all tabs in this match",
+    progress: createMessage("reviewProgress", [groupIndex + 1, groupCount]),
+    keepAllLabel: createMessage(isPair ? "keepBothTabs" : "keepAllMatchTabs"),
+    closeAllLabel: createMessage(isPair ? "closeBothTabs" : "closeAllMatchTabs"),
   };
 }
 
 export function getReviewTabPresentation(tab, fullUrl) {
-  const stateDescription = [tab.active && "active", tab.pinned && "pinned"]
-    .filter(Boolean)
-    .join(" and ");
-  const badge = [tab.active && "Active", tab.pinned && "Pinned"]
-    .filter(Boolean)
-    .join(" · ");
+  const title = tab.title || createMessage("untitledTab");
+  const ariaTitle = tab.title || createMessage("untitledTabLowercase");
+  const url = fullUrl || createMessage("unknownUrl");
+  const stateKey = tab.active && tab.pinned
+    ? "ActivePinned"
+    : tab.active
+      ? "Active"
+      : tab.pinned
+        ? "Pinned"
+        : "";
 
   return {
-    title: tab.title || "Untitled tab",
-    badge: badge || null,
-    ariaLabel: [
-      `Keep ${tab.title || "untitled tab"}`,
-      fullUrl,
-      stateDescription,
-      "and close the other matching tabs",
-    ]
-      .filter(Boolean)
-      .join(", "),
+    title,
+    badge: stateKey ? createMessage(`reviewBadge${stateKey}`) : null,
+    ariaLabel: createMessage(`keepReviewTab${stateKey}`, [ariaTitle, url]),
   };
 }
 

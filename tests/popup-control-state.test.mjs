@@ -2,12 +2,36 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  getActionControlState,
+  getActionControlState as createActionControlState,
   getRecentControlState,
   getReviewControlState,
-  getUndoControlState,
+  getUndoControlState as createUndoControlState,
   shouldUngroupDomains,
 } from "../popup-control-state.mjs";
+import { createEnglishTranslator } from "./i18n-test-helper.mjs";
+
+const translate = createEnglishTranslator();
+const getActionControlState = (state) => {
+  const controls = createActionControlState(state);
+  return {
+    ...controls,
+    domainGroupTitle: translate(controls.domainGroupTitle),
+    domainGroupDescription: translate(controls.domainGroupDescription),
+    domainGroupActionDescription: translate(
+      controls.domainGroupActionDescription,
+    ),
+  };
+};
+const getUndoControlState = (state) => {
+  const controls = createUndoControlState(state);
+  return controls.hidden
+    ? controls
+    : {
+      ...controls,
+      text: translate(controls.text),
+      ariaLabel: translate(controls.ariaLabel),
+    };
+};
 
 function popupState(overrides = {}) {
   return {

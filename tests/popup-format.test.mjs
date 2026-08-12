@@ -2,29 +2,44 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  formatDuplicateCleanupOutcome,
-  formatGatherOutcome,
-  formatGroupOutcome,
+  formatDuplicateCleanupOutcome as createDuplicateCleanupOutcome,
+  formatGatherOutcome as createGatherOutcome,
+  formatGroupOutcome as createGroupOutcome,
   formatGroupTitle,
-  formatRestorationOutcome,
-  formatReviewOutcome,
-  formatReviewStopped,
-  formatSortOutcome,
-  formatSummary,
-  formatUnclosedTabs,
-  formatUngroupOutcome,
+  formatRestorationOutcome as createRestorationOutcome,
+  formatReviewOutcome as createReviewOutcome,
+  formatReviewStopped as createReviewStopped,
+  formatSortOutcome as createSortOutcome,
+  formatSummary as createSummary,
+  formatUnclosedTabs as createUnclosedTabs,
+  formatUngroupOutcome as createUngroupOutcome,
   getErrorMessage,
   getGroupColor,
   getTabUrlValue,
-  pluralize,
 } from "../popup-format.mjs";
+import { createEnglishTranslator } from "./i18n-test-helper.mjs";
 
-test("pluralizes only when the count is not one", () => {
-  assert.equal(pluralize("tab", 1), "tab");
-  assert.equal(pluralize("tab", 0), "tabs");
-  assert.equal(pluralize("tab", 2), "tabs");
-  assert.equal(pluralize("match", 3), "matchs");
+const translate = createEnglishTranslator();
+const localizeOutcome = (outcome) => ({
+  ...outcome,
+  message: translate(outcome.message),
 });
+const formatDuplicateCleanupOutcome = (...args) =>
+  localizeOutcome(createDuplicateCleanupOutcome(...args));
+const formatGatherOutcome = (...args) => translate(createGatherOutcome(...args));
+const formatGroupOutcome = (...args) => translate(createGroupOutcome(...args));
+const formatRestorationOutcome = (...args) =>
+  localizeOutcome(createRestorationOutcome(...args));
+const formatReviewOutcome = (...args) =>
+  localizeOutcome(createReviewOutcome(...args));
+const formatReviewStopped = (...args) =>
+  translate(createReviewStopped(...args));
+const formatSortOutcome = (...args) => translate(createSortOutcome(...args));
+const formatSummary = (...args) => translate(createSummary(...args));
+const formatUnclosedTabs = (...args) =>
+  translate(createUnclosedTabs(...args));
+const formatUngroupOutcome = (...args) =>
+  translate(createUngroupOutcome(...args));
 
 test("formats the status summary line", () => {
   assert.equal(
@@ -73,8 +88,8 @@ test("prefers a tab's pending address over its current address", () => {
     "https://pending.test/",
   );
   assert.equal(getTabUrlValue({ url: "https://a/" }), "https://a/");
-  assert.equal(getTabUrlValue({}), "Unknown URL");
-  assert.equal(getTabUrlValue({ url: "" }), "Unknown URL");
+  assert.equal(getTabUrlValue({}), "");
+  assert.equal(getTabUrlValue({ url: "" }), "");
 });
 
 test("reads a message from errors and non-errors", () => {
@@ -100,8 +115,7 @@ test("describes a fully restored cleanup", () => {
     },
   );
   assert.equal(
-    formatRestorationOutcome({ status: "restored", restored: 3, recreated: 2 })
-      .message,
+    formatRestorationOutcome({ status: "restored", restored: 3, recreated: 2 }).message,
     "Restored 3 tabs. 2 tabs reopened from saved addresses because Chrome no longer had browsing history.",
   );
 });
@@ -208,12 +222,10 @@ test("reports the similar-tab review outcome", () => {
   );
   assert.equal(
     formatReviewOutcome({ closedCount: 0, reviewedCount: 3 }).message,
-    "Kept all tabs from 3 possible matchs.",
+    "Kept all tabs from 3 possible matches.",
   );
 });
 
-// "matchs" is the existing wording produced by pluralize(); this refactor pins
-// it rather than changing what users see.
 test("reports how many matches a stopped review left alone", () => {
   assert.equal(
     formatReviewStopped(1),
@@ -221,7 +233,7 @@ test("reports how many matches a stopped review left alone", () => {
   );
   assert.equal(
     formatReviewStopped(2),
-    "Review stopped. 2 possible matchs left unchanged.",
+    "Review stopped. 2 possible matches left unchanged.",
   );
 });
 
