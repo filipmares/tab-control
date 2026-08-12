@@ -133,7 +133,7 @@ test("edits tabs and groups through the Chrome surface", async () => {
   const chrome = createFakeChrome();
   const adapter = createChromeAdapter(chrome.api);
 
-  await adapter.moveTab(7, 2);
+  await adapter.moveTabs([7, 9], 2);
   await adapter.moveTabsToWindow([7, 8], 3);
   await adapter.groupTabs([7, 8]);
   await adapter.updateTabGroup(4, { title: "example.com" });
@@ -141,7 +141,7 @@ test("edits tabs and groups through the Chrome surface", async () => {
   await adapter.createTab("https://example.test/");
 
   assert.deepEqual(chrome.calls, [
-    ["tabs.move", 7, { index: 2 }],
+    ["tabs.move", [7, 9], { index: 2 }],
     ["tabs.move", [7, 8], { windowId: 3, index: -1 }],
     ["tabs.group", { tabIds: [7, 8] }],
     ["tabGroups.update", 4, { title: "example.com" }],

@@ -11,6 +11,7 @@ import {
   getPartialDuplicateGroups,
   getReviewTabIdsToClose,
   getSortedTabIds,
+  getTabMovePlan,
   getTabsByIds,
   getTabSummary,
   isSameTabOrder,
@@ -121,6 +122,24 @@ test("sorts regular tabs by domain and title while pinned tabs stay put", () => 
   ];
 
   assert.deepEqual(getSortedTabIds(tabs), [1, 2, 5, 4, 3]);
+});
+
+test("batches adjacent tabs into runs for a sorted move plan", () => {
+  assert.deepEqual(
+    getTabMovePlan(
+      [1, 2, 3, 4, 5, 6, 7],
+      [1, 2, 5, 6, 3, 4, 7],
+    ),
+    [
+      { tabIds: [5, 6], index: 2 },
+      { tabIds: [3, 4], index: 4 },
+      { tabIds: [7], index: 6 },
+    ],
+  );
+});
+
+test("does not plan moves for tabs that are already sorted", () => {
+  assert.deepEqual(getTabMovePlan([1, 2, 3], [1, 2, 3]), []);
 });
 
 test("groups repeated unpinned domains that are not already grouped", () => {

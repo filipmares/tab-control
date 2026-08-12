@@ -30,8 +30,8 @@ export function createChromeAdapter(api) {
 
       return { tabs, currentWindow, windows };
     },
-    moveTab(tabId, index) {
-      return api.tabs.move(tabId, { index });
+    moveTabs(tabIds, index) {
+      return api.tabs.move(tabIds, { index });
     },
     moveTabsToWindow(tabIds, windowId) {
       return api.tabs.move(tabIds, { windowId, index: -1 });

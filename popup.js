@@ -7,6 +7,7 @@ import {
   getPartialDuplicateGroups,
   getReviewTabIdsToClose,
   getSortedTabIds,
+  getTabMovePlan,
   getTabsByIds,
   getTabSummary,
   isSameTabOrder,
@@ -612,22 +613,14 @@ async function sortTabsByDomain() {
     const tabs = await browser.queryCurrentWindowTabs();
     const currentIds = getCurrentTabIdOrder(tabs);
     const sortedIds = getSortedTabIds(tabs);
-    let hasMovedTab = false;
 
     if (isSameTabOrder(currentIds, sortedIds)) {
       setStatus("This window is already sorted by domain.");
       return;
     }
 
-    for (const [index, tabId] of sortedIds.entries()) {
-      // Positions stay accurate only until the first move, so the leading
-      // already-correct run is the only safe part to skip.
-      if (!hasMovedTab && currentIds[index] === tabId) {
-        continue;
-      }
-
-      hasMovedTab = true;
-      await moveTabWithRetry(tabId, index);
+    for (const move of getTabMovePlan(currentIds, sortedIds)) {
+      await moveTabsWithRetry(move.tabIds, move.index);
     }
 
     const summary = await refreshSummary();
@@ -895,8 +888,8 @@ function showRestorationOutcome(outcome) {
   setStatus(message, tone);
 }
 
-async function moveTabWithRetry(tabId, index) {
-  await runWithTabEditRetry(() => browser.moveTab(tabId, index));
+async function moveTabsWithRetry(tabIds, index) {
+  await runWithTabEditRetry(() => browser.moveTabs(tabIds, index));
 }
 
 function setBusy(busy, message) {
