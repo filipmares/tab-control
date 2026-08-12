@@ -244,7 +244,14 @@ export function getPartialDuplicateGroups(tabs) {
   const entries = tabs
     .map((tab) => createPartialUrlEntry(tab))
     .filter(Boolean);
+  const entriesByOrigin = new Map();
   const parents = entries.map((_, index) => index);
+
+  for (const [index, entry] of entries.entries()) {
+    const originEntries = entriesByOrigin.get(entry.origin) || [];
+    originEntries.push(index);
+    entriesByOrigin.set(entry.origin, originEntries);
+  }
 
   function find(index) {
     if (parents[index] !== index) {
@@ -263,14 +270,23 @@ export function getPartialDuplicateGroups(tabs) {
     }
   }
 
-  for (let leftIndex = 0; leftIndex < entries.length; leftIndex += 1) {
+  for (const originEntries of entriesByOrigin.values()) {
     for (
-      let rightIndex = leftIndex + 1;
-      rightIndex < entries.length;
-      rightIndex += 1
+      let leftOffset = 0;
+      leftOffset < originEntries.length;
+      leftOffset += 1
     ) {
-      if (isPartialUrlMatch(entries[leftIndex], entries[rightIndex])) {
-        union(leftIndex, rightIndex);
+      for (
+        let rightOffset = leftOffset + 1;
+        rightOffset < originEntries.length;
+        rightOffset += 1
+      ) {
+        const leftIndex = originEntries[leftOffset];
+        const rightIndex = originEntries[rightOffset];
+
+        if (isPartialUrlMatch(entries[leftIndex], entries[rightIndex])) {
+          union(leftIndex, rightIndex);
+        }
       }
     }
   }

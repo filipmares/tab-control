@@ -362,6 +362,52 @@ test("finds partial URL matches without using unsafe string prefixes", () => {
   );
 });
 
+test("keeps similar tab groups isolated by origin and ordered by tab index", () => {
+  const tabs = [
+    {
+      id: 80,
+      index: 0,
+      url: "https://alpha.example/projects/one",
+    },
+    {
+      id: 81,
+      index: 1,
+      url: "https://beta.example/reports/daily",
+    },
+    {
+      id: 82,
+      index: 2,
+      url: "https://alpha.example/projects/one/activity",
+    },
+    {
+      id: 83,
+      index: 3,
+      url: "https://gamma.example/reports/daily",
+    },
+    {
+      id: 84,
+      index: 4,
+      url: "https://beta.example/reports/daily/summary",
+    },
+    {
+      id: 85,
+      index: 5,
+      url: "https://gamma.example/reports/daily/summary",
+    },
+  ];
+
+  assert.deepEqual(
+    getPartialDuplicateGroups(tabs).map((group) =>
+      group.map((tab) => tab.id),
+    ),
+    [
+      [80, 82],
+      [81, 84],
+      [83, 85],
+    ],
+  );
+});
+
 test("normalizes common domain labels and reports summary counts", () => {
   const tabs = [
     {
