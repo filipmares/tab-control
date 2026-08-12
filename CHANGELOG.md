@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.4](https://github.com/filipmares/tab-control/compare/v3.0.3...v3.0.4) (2026-08-11)
+
+
+### Bug Fixes
+
+* keep pinned tabs in place when sorting by domain ([#45](https://github.com/filipmares/tab-control/issues/45)) ([94b15ef](https://github.com/filipmares/tab-control/commit/94b15ef0e22d7542f60479f4b8cabfa72a0b9cba))
+
 ## [3.0.3](https://github.com/filipmares/tab-control/compare/v3.0.2...v3.0.3) (2026-08-11)
 
 
