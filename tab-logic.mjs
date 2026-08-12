@@ -126,6 +126,41 @@ export function isSameTabOrder(left, right) {
   );
 }
 
+export function getTabMovePlan(currentIds, targetIds) {
+  const currentIndexes = new Map(
+    currentIds.map((tabId, index) => [tabId, index]),
+  );
+  let targetIndex = 0;
+
+  while (
+    targetIndex < targetIds.length &&
+    currentIds[targetIndex] === targetIds[targetIndex]
+  ) {
+    targetIndex += 1;
+  }
+
+  const moves = [];
+
+  while (targetIndex < targetIds.length) {
+    const tabIds = [targetIds[targetIndex]];
+    let nextTargetIndex = targetIndex + 1;
+
+    while (
+      nextTargetIndex < targetIds.length &&
+      currentIndexes.get(targetIds[nextTargetIndex]) ===
+        currentIndexes.get(targetIds[nextTargetIndex - 1]) + 1
+    ) {
+      tabIds.push(targetIds[nextTargetIndex]);
+      nextTargetIndex += 1;
+    }
+
+    moves.push({ tabIds, index: targetIndex });
+    targetIndex = nextTargetIndex;
+  }
+
+  return moves;
+}
+
 export function getTabsByIds(tabs, tabIds) {
   const ids = new Set(tabIds);
   return tabs.filter((tab) => ids.has(tab.id));
