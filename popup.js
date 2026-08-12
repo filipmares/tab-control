@@ -784,11 +784,8 @@ async function refreshLiveSummary() {
 }
 
 async function readSummarySnapshot() {
-  const [tabs, currentWindow, windows] = await Promise.all([
-    browser.queryCurrentWindowTabs(),
-    browser.getCurrentWindow(),
-    browser.getNormalWindows(),
-  ]);
+  const { tabs, currentWindow, windows } =
+    await browser.getCurrentWindowSnapshot();
 
   return {
     tabs,
