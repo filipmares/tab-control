@@ -19,8 +19,8 @@ export function createChromeAdapter(api) {
     getNormalWindows() {
       return api.windows.getAll({ populate: true, windowTypes: ["normal"] });
     },
-    moveTab(tabId, index) {
-      return api.tabs.move(tabId, { index });
+    moveTabs(tabIds, index) {
+      return api.tabs.move(tabIds, { index });
     },
     moveTabsToWindow(tabIds, windowId) {
       return api.tabs.move(tabIds, { windowId, index: -1 });
