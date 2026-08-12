@@ -71,6 +71,64 @@ test("reads tabs and windows with the popup's query shapes", async () => {
   ]);
 });
 
+test("reuses populated tabs when reading the current window snapshot", async () => {
+  const chrome = createFakeChrome();
+  const currentWindow = { id: 1, type: "normal" };
+  const tabs = [{ id: 10 }, { id: 11 }];
+  const windows = [
+    { ...currentWindow, tabs },
+    { id: 2, type: "normal", tabs: [{ id: 20 }] },
+  ];
+  chrome.api.windows.getCurrent = () => {
+    chrome.calls.push(["windows.getCurrent"]);
+    return Promise.resolve(currentWindow);
+  };
+  chrome.api.windows.getAll = (...args) => {
+    chrome.calls.push(["windows.getAll", ...args]);
+    return Promise.resolve(windows);
+  };
+
+  const snapshot = await createChromeAdapter(
+    chrome.api,
+  ).getCurrentWindowSnapshot();
+
+  assert.deepEqual(snapshot, { tabs, currentWindow, windows });
+  assert.deepEqual(chrome.calls, [
+    ["windows.getCurrent"],
+    ["windows.getAll", { populate: true, windowTypes: ["normal"] }],
+  ]);
+});
+
+test("queries tabs when the current window is not a normal window", async () => {
+  const chrome = createFakeChrome();
+  const currentWindow = { id: 3, type: "popup" };
+  const tabs = [{ id: 30 }];
+  const windows = [{ id: 1, type: "normal", tabs: [{ id: 10 }] }];
+  chrome.api.windows.getCurrent = () => {
+    chrome.calls.push(["windows.getCurrent"]);
+    return Promise.resolve(currentWindow);
+  };
+  chrome.api.windows.getAll = (...args) => {
+    chrome.calls.push(["windows.getAll", ...args]);
+    return Promise.resolve(windows);
+  };
+  chrome.api.tabs.query = (...args) => {
+    chrome.calls.push(["tabs.query", ...args]);
+    return Promise.resolve(tabs);
+  };
+
+  const snapshot = await createChromeAdapter(
+    chrome.api,
+  ).getCurrentWindowSnapshot();
+
+  assert.deepEqual(snapshot, { tabs, currentWindow, windows });
+  assert.deepEqual(chrome.calls, [
+    ["windows.getCurrent"],
+    ["windows.getAll", { populate: true, windowTypes: ["normal"] }],
+    ["tabs.query", { currentWindow: true }],
+  ]);
+});
+
 test("edits tabs and groups through the Chrome surface", async () => {
   const chrome = createFakeChrome();
   const adapter = createChromeAdapter(chrome.api);
