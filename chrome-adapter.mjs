@@ -19,6 +19,17 @@ export function createChromeAdapter(api) {
     getNormalWindows() {
       return api.windows.getAll({ populate: true, windowTypes: ["normal"] });
     },
+    async getCurrentWindowSnapshot() {
+      const [currentWindow, windows] = await Promise.all([
+        api.windows.getCurrent(),
+        api.windows.getAll({ populate: true, windowTypes: ["normal"] }),
+      ]);
+      const tabs =
+        windows.find((window) => window.id === currentWindow.id)?.tabs ??
+        (await api.tabs.query({ currentWindow: true }));
+
+      return { tabs, currentWindow, windows };
+    },
     moveTab(tabId, index) {
       return api.tabs.move(tabId, { index });
     },
