@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.0.5](https://github.com/filipmares/tab-control/compare/v3.0.4...v3.0.5) (2026-08-12)
+
+
+### Performance Improvements
+
+* avoid duplicate current window tab query ([#49](https://github.com/filipmares/tab-control/issues/49)) ([f62d882](https://github.com/filipmares/tab-control/commit/f62d88243d9b1a084cc1473a670859f20d163202))
+* batch domain sort tab moves ([#50](https://github.com/filipmares/tab-control/issues/50)) ([568215a](https://github.com/filipmares/tab-control/commit/568215aa78cbc1a91d219e15c60b4d711b42f54b)), closes [#28](https://github.com/filipmares/tab-control/issues/28)
+* bucket similar tabs by origin ([#48](https://github.com/filipmares/tab-control/issues/48)) ([b39f53d](https://github.com/filipmares/tab-control/commit/b39f53d7c9f841524c7239571abe8378245b4232))
+
 ## [3.0.4](https://github.com/filipmares/tab-control/compare/v3.0.3...v3.0.4) (2026-08-11)
 
 
