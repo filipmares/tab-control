@@ -265,7 +265,7 @@ export function createBackgroundMessageHandler(browser) {
       }
     }
 
-    const windows = await browser.getAllWindows({ windowTypes: ["normal"] });
+    const windows = await browser.getNormalWindows();
     const fallbackWindow = windows.find(
       (window) => Boolean(window.incognito) === snapshot.incognito,
     );

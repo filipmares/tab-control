@@ -1021,5 +1021,5 @@ function syncUndoState() {
 }
 
 function openIssueTracker() {
-  browser.createTab(ISSUE_TRACKER_URL);
+  browser.createTab({ url: ISSUE_TRACKER_URL });
 }

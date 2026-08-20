@@ -23,7 +23,7 @@ function createFakeBrowser() {
     type: "normal",
     incognito: false,
   });
-  let getAllWindowsImpl = async () => [];
+  let getNormalWindowsImpl = async () => [];
   let queryWindowTabsImpl = async () => [];
   let onSet;
 
@@ -50,8 +50,8 @@ function createFakeBrowser() {
     set getWindowImpl(value) {
       getWindowImpl = value;
     },
-    set getAllWindowsImpl(value) {
-      getAllWindowsImpl = value;
+    set getNormalWindowsImpl(value) {
+      getNormalWindowsImpl = value;
     },
     set queryWindowTabsImpl(value) {
       queryWindowTabsImpl = value;
@@ -98,9 +98,9 @@ function createFakeBrowser() {
       calls.push(["getWindow", windowId]);
       return getWindowImpl(windowId);
     },
-    async getAllWindows(options) {
-      calls.push(["getAllWindows", options]);
-      return getAllWindowsImpl(options);
+    async getNormalWindows() {
+      calls.push(["getNormalWindows"]);
+      return getNormalWindowsImpl();
     },
     async queryWindowTabs(windowId) {
       calls.push(["queryWindowTabs", windowId]);
@@ -288,10 +288,7 @@ test("reuses a matching original normal window", async () => {
 
   assert.equal(result.outcome.status, "restored");
   assert.equal(
-    browser.calls.some(
-      ([name, options]) =>
-        name === "getAllWindows" && options?.windowTypes?.[0] === "normal",
-    ),
+    browser.calls.some(([name]) => name === "getNormalWindows"),
     false,
   );
   assert.equal(browser.calls.at(-1)[0], "removeSessionValue");
@@ -308,7 +305,7 @@ test("falls back for incognito mismatch and non-normal windows", async () => {
       snapshot(12),
     ]);
     browser.getWindowImpl = async () => originalWindow;
-    browser.getAllWindowsImpl = async () => [
+    browser.getNormalWindowsImpl = async () => [
       { id: 9, type: "normal", incognito: false },
     ];
     browser.queryWindowTabsImpl = async () => [];
@@ -335,7 +332,7 @@ test("swallows a missing original window and uses a compatible fallback", async 
   browser.getWindowImpl = async () => {
     throw new Error("No window with id: 5.");
   };
-  browser.getAllWindowsImpl = async () => [
+  browser.getNormalWindowsImpl = async () => [
     { id: 9, type: "normal", incognito: false },
   ];
   browser.queryWindowTabsImpl = async () => [];
@@ -347,7 +344,7 @@ test("swallows a missing original window and uses a compatible fallback", async 
 
   assert.equal(result.outcome.status, "restored");
   assert.equal(
-    browser.calls.some(([name]) => name === "getAllWindows"),
+    browser.calls.some(([name]) => name === "getNormalWindows"),
     true,
   );
 });
@@ -363,7 +360,7 @@ test("reports no-compatible-window failures", async () => {
     type: "popup",
     incognito: false,
   });
-  browser.getAllWindowsImpl = async () => [
+  browser.getNormalWindowsImpl = async () => [
     { id: 9, type: "normal", incognito: true },
   ];
 
@@ -410,7 +407,7 @@ test("reopens a fully failed restoration for retry", async () => {
     type: "popup",
     incognito: false,
   });
-  browser.getAllWindowsImpl = async () => [];
+  browser.getNormalWindowsImpl = async () => [];
 
   const result = await handler({
     type: "RESTORE_DUPLICATE_CLEANUP",

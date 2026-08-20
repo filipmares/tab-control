@@ -93,7 +93,6 @@ test("adapts the background storage, tab, and window operations", async () => {
   await adapter.removeSessionValue("key");
   await adapter.removeTab(7);
   await adapter.getWindow(3);
-  await adapter.getAllWindows({ windowTypes: ["normal"] });
   await adapter.queryWindowTabs(3);
 
   assert.deepEqual(chrome.calls, [
@@ -102,7 +101,6 @@ test("adapts the background storage, tab, and window operations", async () => {
     ["storage.session.remove", "key"],
     ["tabs.remove", 7],
     ["windows.get", 3],
-    ["windows.getAll", { windowTypes: ["normal"] }],
     ["tabs.query", { windowId: 3 }],
   ]);
 });
@@ -174,7 +172,7 @@ test("edits tabs and groups through the Chrome surface", async () => {
   await adapter.groupTabs([7, 8]);
   await adapter.updateTabGroup(4, { title: "example.com" });
   await adapter.ungroupTabs([7, 8]);
-  await adapter.createTab("https://example.test/");
+  await adapter.createTab({ url: "https://example.test/" });
 
   assert.deepEqual(chrome.calls, [
     ["tabs.move", [7, 9], { index: 2 }],

@@ -28,9 +28,6 @@ export function createChromeAdapter(api) {
     getWindow(windowId) {
       return api.windows.get(windowId);
     },
-    getAllWindows(options) {
-      return api.windows.getAll(options);
-    },
     queryWindowTabs(windowId) {
       return api.tabs.query({ windowId });
     },
@@ -70,9 +67,7 @@ export function createChromeAdapter(api) {
       return api.tabs.ungroup(tabIds);
     },
     createTab(options) {
-      return api.tabs.create(
-        typeof options === "string" ? { url: options } : options,
-      );
+      return api.tabs.create(options);
     },
     async sendBackgroundMessage(message) {
       const response = await api.runtime.sendMessage(message);
