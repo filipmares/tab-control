@@ -206,6 +206,23 @@ test("uses distinct direct messages for each organizing undo", () => {
   );
 });
 
+test("describes warning-only gather partial outcomes without a fake failure count", () => {
+  assert.equal(
+    formatRestorationOutcome(
+      {
+        status: "partial",
+        restored: 9,
+        total: 9,
+        failed: 0,
+        windowCount: 2,
+        failures: ["Source window 7 was closed."],
+      },
+      "gather-tabs-here",
+    ).message,
+    "Returned 9 tabs to a surviving window, but the original window was unavailable. Source window 7 was closed.",
+  );
+});
+
 test("reports the duplicate cleanup outcome", () => {
   assert.deepEqual(
     formatDuplicateCleanupOutcome({

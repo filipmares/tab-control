@@ -282,9 +282,23 @@ export function reopenUndoTransaction(transaction) {
     throw new Error("A partially restored transaction cannot be retried.");
   }
 
+  const operation = getOperation(transaction);
+
   return {
     ...transaction,
     state: UNDO_TRANSACTION_STATE.OPEN,
+    ...(operation === UNDO_OPERATION.GATHER_TABS_HERE
+      ? {
+          data: {
+            ...transaction.data,
+            tabs: transaction.data.tabs.map((tab) =>
+              tab.state === "failed"
+                ? { ...tab, state: "moved", failure: null }
+                : tab,
+            ),
+          },
+        }
+      : {}),
   };
 }
 
@@ -314,7 +328,13 @@ export function getRestorationOutcome(transaction, errors = []) {
     failed,
     ...(getOperation(transaction) === UNDO_OPERATION.GROUP_TABS ||
     getOperation(transaction) === UNDO_OPERATION.UNGROUP_TABS
-      ? { groupCount: transaction.data?.groups?.length || 0 }
+      ? {
+          groupCount: (transaction.data?.groups || []).filter(
+            (group) =>
+              getOperation(transaction) === UNDO_OPERATION.UNGROUP_TABS ||
+              Number.isInteger(group.groupId),
+          ).length,
+        }
       : {}),
     ...(getOperation(transaction) === UNDO_OPERATION.GATHER_TABS_HERE
       ? {
@@ -347,7 +367,11 @@ export function getOperationRestorationStats(transaction) {
     );
     const total = groups.reduce((count, group) => count + group.tabIds.length, 0);
     const restored = groups.reduce(
-      (count, group) => count + group.restoredTabIds.length,
+      (count, group) =>
+        count +
+        (Array.isArray(group.restoredTabIds)
+          ? group.restoredTabIds.length
+          : 0),
       0,
     );
     const failed = total - restored;

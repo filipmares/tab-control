@@ -659,8 +659,8 @@ test("ungroups the tabs created by a grouping operation", async () => {
       id: 5,
       type: "normal",
       tabs: [
-        { id: 1, windowId: 5 },
-        { id: 2, windowId: 5 },
+        { id: 1, windowId: 5, groupId: 12 },
+        { id: 2, windowId: 5, groupId: 12 },
       ],
     },
   ];
@@ -716,5 +716,37 @@ test("recreates dissolved groups with their captured appearance", async () => {
       color: "blue",
       collapsed: true,
     }]],
+  );
+});
+
+test("does not ungroup tabs that moved into a newer group", async () => {
+  const browser = createFakeBrowser();
+  const handler = createBackgroundMessageHandler(browser);
+  const transaction = await beginOperation(handler, "group-tabs", {
+    groups: [{ groupId: 12, tabIds: [1, 2, 3] }],
+  });
+  browser.getNormalWindowsImpl = async () => [
+    {
+      id: 5,
+      type: "normal",
+      tabs: [
+        { id: 1, windowId: 5, groupId: -1 },
+        { id: 2, windowId: 5, groupId: 12 },
+        { id: 3, windowId: 5, groupId: 99 },
+      ],
+    },
+  ];
+
+  const result = await handler({
+    type: "RESTORE_UNDO_TRANSACTION",
+    transactionId: transaction.id,
+  });
+
+  assert.equal(result.outcome.status, "partial");
+  assert.equal(result.outcome.restored, 2);
+  assert.equal(result.outcome.failed, 1);
+  assert.deepEqual(
+    browser.calls.filter(([name]) => name === "ungroupTabs"),
+    [["ungroupTabs", [2]]],
   );
 });

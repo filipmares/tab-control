@@ -325,32 +325,50 @@ export function createBackgroundMessageHandler(browser) {
         await saveTransaction(current);
         continue;
       }
-      const presentTabIds = group.tabIds.filter((tabId) =>
-        Boolean(findTab(windows, tabId)),
+      const currentTabs = new Map(
+        group.tabIds.map((tabId) => [tabId, findTab(windows, tabId)]),
       );
       const missingTabIds = group.tabIds.filter(
-        (tabId) => !presentTabIds.includes(tabId),
+        (tabId) => !currentTabs.get(tabId),
       );
+      const alreadyUngroupedTabIds = group.tabIds.filter((tabId) => {
+        const tab = currentTabs.get(tabId);
+        return tab && (!Number.isInteger(tab.groupId) || tab.groupId < 0);
+      });
+      const capturedGroupTabIds = group.tabIds.filter((tabId) => {
+        const tab = currentTabs.get(tabId);
+        return tab && tab.groupId === group.groupId;
+      });
+      const conflictingTabIds = group.tabIds.filter((tabId) => {
+        const tab = currentTabs.get(tabId);
+        return (
+          tab &&
+          Number.isInteger(tab.groupId) &&
+          tab.groupId >= 0 &&
+          tab.groupId !== group.groupId
+        );
+      });
+      const failedTabIds = [...missingTabIds, ...conflictingTabIds];
 
       try {
-        if (presentTabIds.length > 0) {
-          await browser.ungroupTabs(presentTabIds);
+        if (capturedGroupTabIds.length > 0) {
+          await browser.ungroupTabs(capturedGroupTabIds);
         }
         current = markGroupResult(
           current,
           groupIndex,
-          presentTabIds,
-          missingTabIds,
-          missingTabIds.length > 0
-            ? `Tabs ${missingTabIds.join(", ")} are no longer open.`
+          [...alreadyUngroupedTabIds, ...capturedGroupTabIds],
+          failedTabIds,
+          failedTabIds.length > 0
+            ? `Tabs ${failedTabIds.join(", ")} could not be safely ungrouped.`
             : null,
         );
       } catch (error) {
         current = markGroupResult(
           current,
           groupIndex,
-          [],
-          group.tabIds,
+          alreadyUngroupedTabIds,
+          [...failedTabIds, ...capturedGroupTabIds],
           `Could not ungroup the created domain group: ${getErrorMessage(error)}`,
         );
       }

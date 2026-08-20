@@ -173,6 +173,13 @@ function formatOperationRestorationOutcome(outcome, operation) {
   }
 
   if (outcome.status === "partial") {
+    if (outcome.restored === outcome.total && outcome.failed === 0) {
+      return {
+        message: getOperationWarningMessage(outcome, operation),
+        tone: "error",
+      };
+    }
+
     return {
       message: `${getOperationPartialMessage(outcome, operation)} ${outcome.failed} could not be reversed.${failures}`,
       tone: "error",
@@ -183,6 +190,14 @@ function formatOperationRestorationOutcome(outcome, operation) {
     message: `Could not undo ${getOperationObject(operation)}.${failures}`,
     tone: "error",
   };
+}
+
+function getOperationWarningMessage(outcome, operation) {
+  if (operation === "gather-tabs-here") {
+    return `Returned ${outcome.restored} ${pluralize("tab", outcome.restored)} to a surviving window, but the original window was unavailable.${failuresFor(outcome)}`;
+  }
+
+  return `Restored all ${outcome.restored} ${pluralize("tab", outcome.restored)}, but some organization details were unavailable.${failuresFor(outcome)}`;
 }
 
 function getOperationRestoredMessage(outcome, operation) {
@@ -200,6 +215,10 @@ function getOperationRestoredMessage(outcome, operation) {
     default:
       return `Undid the latest tab organization change for ${tabs}.`;
   }
+}
+
+function failuresFor(outcome) {
+  return outcome.failures?.length ? ` ${outcome.failures.join(" ")}` : "";
 }
 
 function getOperationPartialMessage(outcome, operation) {

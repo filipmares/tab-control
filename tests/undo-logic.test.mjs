@@ -427,3 +427,33 @@ test("plans partial reversals and names gather fallback warnings", () => {
     error: null,
   });
 });
+
+test("reopens a fully failed gather reversal with its tabs retryable", () => {
+  let transaction = queueGatheredTabs(
+    createUndoTransaction({
+      id: "gather-retry",
+      windowId: 5,
+      operation: UNDO_OPERATION.GATHER_TABS_HERE,
+    }),
+    [
+      { tabId: 1, sourceWindowId: 7, index: 0 },
+      { tabId: 2, sourceWindowId: 7, index: 1 },
+    ],
+  );
+  transaction = updateOperationData(transaction, {
+    tabs: transaction.data.tabs.map((tab) => ({
+      ...tab,
+      state: "failed",
+      failure: "The tab could not be moved.",
+    })),
+  });
+
+  const reopened = reopenUndoTransaction(transaction);
+
+  assert.equal(reopened.state, UNDO_TRANSACTION_STATE.OPEN);
+  assert.deepEqual(
+    reopened.data.tabs.map((tab) => tab.state),
+    ["moved", "moved"],
+  );
+  assert.equal(getUndoTransactionSummary(reopened).count, 2);
+});

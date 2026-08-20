@@ -667,6 +667,10 @@ async function groupTabsByDomain() {
     const undoGroups = groupingPlan.map((domain) => ({
       tabIds: domain.tabIds,
       groupId: null,
+      state: "planned",
+      restoredTabIds: [],
+      failedTabIds: [],
+      failure: null,
     }));
     const startedTransaction = await beginUndoOperation(
       "group-tabs",
@@ -804,6 +808,9 @@ async function gatherTabsHere() {
         sourceWindowId: source.windowId,
         index: currentTabById.get(tabId)?.index ?? -1,
         incognito: Boolean(sourceWindowById.get(source.windowId)?.incognito),
+        state: "pending",
+        warning: null,
+        failure: null,
       })),
     );
     const startedTransaction = await beginUndoOperation(
