@@ -11,12 +11,12 @@ Tab Control does not:
 - use analytics or tracking services;
 - keep a permanent or synced tab history.
 
-For the Undo feature, Tab Control keeps the addresses, positions, and Chrome
-session identifiers of tabs closed by the latest duplicate cleanup in Chrome's
-in-memory session storage. The identifiers let Chrome restore browsing history
-when it is still available. This one transaction is replaced by the next
-cleanup, removed after Undo, and cleared when Chrome restarts, the extension
-reloads, or the extension is disabled.
+For the Undo feature, Tab Control keeps the minimum tab, group, window, and
+Chrome session information needed to reverse the latest cleanup or organization
+action in Chrome's in-memory session storage. Session identifiers let Chrome
+restore browsing history for closed tabs when it is still available. This one
+transaction is replaced by the next action, removed after Undo, and cleared
+when Chrome restarts, the extension reloads, or the extension is disabled.
 
 The Recently closed view reads up to 10 entries from Chrome's browser-wide
 recently closed session history while the popup is open. Those entries can
@@ -30,8 +30,8 @@ Chrome and are neither copied into a Tab Control history nor sent elsewhere.
   Chrome tab groups.
 - `sessions` allows the extension to read and restore Chrome's browser-wide
   recently closed tabs and windows.
-- `storage` keeps the latest duplicate cleanup available to Undo only for the
-  current browser session.
+- `storage` keeps the latest cleanup or organization action available to Undo
+  only for the current browser session.
 
 Incognito windows remain separate and are only accessible if the user
 explicitly enables the extension in incognito mode. Cross-window gathering

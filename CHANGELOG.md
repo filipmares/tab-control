@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.1.0](https://github.com/filipmares/tab-control/compare/v3.0.6...v3.1.0) (2026-08-20)
+
+
+### Features
+
+* extend undo to tab organization ([#59](https://github.com/filipmares/tab-control/issues/59)) ([3b7531e](https://github.com/filipmares/tab-control/commit/3b7531e425fbd1f6afa1e489ba0fb0c46d50e61c))
+
+
+### Bug Fixes
+
+* correct sibilant pluralization ([#56](https://github.com/filipmares/tab-control/issues/56)) ([21927f1](https://github.com/filipmares/tab-control/commit/21927f1481ae7f5728825f07943ec1eff1b03519))
+
+## [3.0.6](https://github.com/filipmares/tab-control/compare/v3.0.5...v3.0.6) (2026-08-16)
+
+
+### Bug Fixes
+
+* expose popup action shortcuts to assistive technology ([#52](https://github.com/filipmares/tab-control/issues/52)) ([ab89a76](https://github.com/filipmares/tab-control/commit/ab89a766eee0d4bd833296f2c3b8ef12bf875946)), closes [#26](https://github.com/filipmares/tab-control/issues/26)
+
 ## [3.0.5](https://github.com/filipmares/tab-control/compare/v3.0.4...v3.0.5) (2026-08-12)
 
 

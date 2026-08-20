@@ -134,7 +134,14 @@ export function formatGatherOutcome(gatheredTabCount, windowCount) {
   );
 }
 
-export function formatRestorationOutcome(outcome) {
+export function formatRestorationOutcome(
+  outcome,
+  operation = "duplicate-cleanup",
+) {
+  if (operation !== "duplicate-cleanup") {
+    return formatOperationRestorationOutcome(outcome, operation);
+  }
+
   switch (outcome.status) {
     case "restored": {
       return {
@@ -189,5 +196,116 @@ export function formatRestorationOutcome(outcome) {
         message: createMessage("undoUnavailable"),
         tone: "error",
       };
+  }
+}
+
+function formatOperationRestorationOutcome(outcome, operation) {
+  const failures = outcome.failures?.join(" ") || "";
+
+  if (outcome.status === "expired") {
+    return { message: createMessage("undoUnavailable"), tone: "error" };
+  }
+
+  if (outcome.status === "restored") {
+    return {
+      message: getOperationRestoredMessage(outcome, operation),
+      tone: "success",
+    };
+  }
+
+  if (outcome.status === "partial") {
+    if (outcome.restored === outcome.total && outcome.failed === 0) {
+      return {
+        message: getOperationWarningMessage(outcome, operation),
+        tone: "error",
+      };
+    }
+
+    return {
+      message: getOperationPartialMessage(outcome, operation, failures),
+      tone: "error",
+    };
+  }
+
+  return {
+    message: createMessage(getOperationFailedKey(operation), [failures]),
+    tone: "error",
+  };
+}
+
+function getOperationWarningMessage(outcome, operation) {
+  const tabs = createPluralMessage("tabCount", outcome.restored);
+  const failures = outcome.failures?.join(" ") || "";
+
+  if (operation === "gather-tabs-here") {
+    return createMessage("undoGatherWarning", [tabs, failures]);
+  }
+
+  return createMessage("undoOrganizationWarning", [tabs, failures]);
+}
+
+function getOperationRestoredMessage(outcome, operation) {
+  const tabs = createPluralMessage("tabCount", outcome.restored);
+
+  switch (operation) {
+    case "sort-by-domain":
+      return createMessage("undoSortRestored", [tabs]);
+    case "group-tabs":
+      return createMessage("undoGroupRestored", [tabs]);
+    case "ungroup-tabs":
+      return createMessage("undoUngroupRestored", [
+        tabs,
+        createPluralMessage("domainGroupCount", outcome.groupCount),
+      ]);
+    case "gather-tabs-here":
+      return createMessage("undoGatherRestored", [
+        tabs,
+        createPluralMessage("windowCount", outcome.windowCount),
+      ]);
+    default:
+      return createMessage("undoOrganizationRestored", [tabs]);
+  }
+}
+
+function getOperationPartialMessage(outcome, operation, failures) {
+  const totalTabs = createPluralMessage("tabCount", outcome.total);
+  const substitutions = [
+    outcome.restored,
+    totalTabs,
+    outcome.failed,
+    failures,
+  ];
+  switch (operation) {
+    case "sort-by-domain":
+      return createMessage("undoSortPartial", substitutions);
+    case "group-tabs":
+      return createMessage("undoGroupPartial", substitutions);
+    case "ungroup-tabs":
+      return createMessage("undoUngroupPartial", [
+        ...substitutions,
+        createPluralMessage("domainGroupCount", outcome.groupCount),
+      ]);
+    case "gather-tabs-here":
+      return createMessage("undoGatherPartial", [
+        ...substitutions,
+        createPluralMessage("windowCount", outcome.windowCount),
+      ]);
+    default:
+      return createMessage("undoOrganizationPartial", substitutions);
+  }
+}
+
+function getOperationFailedKey(operation) {
+  switch (operation) {
+    case "sort-by-domain":
+      return "undoSortFailed";
+    case "group-tabs":
+      return "undoGroupFailed";
+    case "ungroup-tabs":
+      return "undoUngroupFailed";
+    case "gather-tabs-here":
+      return "undoGatherFailed";
+    default:
+      return "undoOrganizationFailed";
   }
 }

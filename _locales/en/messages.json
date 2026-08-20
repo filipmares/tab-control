@@ -432,5 +432,153 @@
   "restoreWindowLabelWithTitles": {
     "message": "Restore window with $TAB_COUNT$: $TITLES$",
     "placeholders": { "tab_count": { "content": "$1" }, "titles": { "content": "$2" } }
+  },
+  "groupCount_one": {
+    "message": "$COUNT$ group",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "groupCount_other": {
+    "message": "$COUNT$ groups",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "domainGroupCount_one": {
+    "message": "$COUNT$ domain group",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "domainGroupCount_other": {
+    "message": "$COUNT$ domain groups",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "windowCount_one": {
+    "message": "$COUNT$ window",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "windowCount_other": {
+    "message": "$COUNT$ windows",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "undoSortText": {
+    "message": "Sorted $TABS$",
+    "placeholders": { "tabs": { "content": "$1" } }
+  },
+  "undoSortLabel": {
+    "message": "Undo sorting and restore the previous order of $TABS$",
+    "placeholders": { "tabs": { "content": "$1" } }
+  },
+  "undoGroupText": {
+    "message": "Grouped $TABS$ into $GROUPS$",
+    "placeholders": { "tabs": { "content": "$1" }, "groups": { "content": "$2" } }
+  },
+  "undoGroupLabel": {
+    "message": "Undo grouping and ungroup $TABS$ from $GROUPS$",
+    "placeholders": { "tabs": { "content": "$1" }, "groups": { "content": "$2" } }
+  },
+  "undoUngroupText": {
+    "message": "Ungrouped $TABS$ from $GROUPS$",
+    "placeholders": { "tabs": { "content": "$1" }, "groups": { "content": "$2" } }
+  },
+  "undoUngroupLabel": {
+    "message": "Undo ungrouping and restore $TABS$ to $GROUPS$",
+    "placeholders": { "tabs": { "content": "$1" }, "groups": { "content": "$2" } }
+  },
+  "undoGatherText": {
+    "message": "Gathered $TABS$ from $WINDOWS$",
+    "placeholders": { "tabs": { "content": "$1" }, "windows": { "content": "$2" } }
+  },
+  "undoGatherLabel": {
+    "message": "Undo gathering and return $TABS$ to $WINDOWS$",
+    "placeholders": { "tabs": { "content": "$1" }, "windows": { "content": "$2" } }
+  },
+  "undoingLatestOrganization": {
+    "message": "Undoing the latest tab organization…"
+  },
+  "couldNotUndoLatestOrganization": {
+    "message": "Could not undo the latest tab organization. $ERROR$",
+    "placeholders": { "error": { "content": "$1" } }
+  },
+  "undoGatherWarning": {
+    "message": "Returned $TABS$ to a surviving window, but the original window was unavailable. $FAILURES$",
+    "placeholders": { "tabs": { "content": "$1" }, "failures": { "content": "$2" } }
+  },
+  "undoOrganizationWarning": {
+    "message": "Restored all $TABS$, but some organization details were unavailable. $FAILURES$",
+    "placeholders": { "tabs": { "content": "$1" }, "failures": { "content": "$2" } }
+  },
+  "undoSortRestored": {
+    "message": "Restored the previous order of $TABS$.",
+    "placeholders": { "tabs": { "content": "$1" } }
+  },
+  "undoGroupRestored": {
+    "message": "Ungrouped $TABS$.",
+    "placeholders": { "tabs": { "content": "$1" } }
+  },
+  "undoUngroupRestored": {
+    "message": "Regrouped $TABS$ into $GROUPS$.",
+    "placeholders": { "tabs": { "content": "$1" }, "groups": { "content": "$2" } }
+  },
+  "undoGatherRestored": {
+    "message": "Returned $TABS$ to $WINDOWS$.",
+    "placeholders": { "tabs": { "content": "$1" }, "windows": { "content": "$2" } }
+  },
+  "undoOrganizationRestored": {
+    "message": "Undid the latest tab organization change for $TABS$.",
+    "placeholders": { "tabs": { "content": "$1" } }
+  },
+  "undoSortPartial": {
+    "message": "Restored the previous order of $RESTORED$ of $TOTAL_TABS$. $FAILED$ could not be reversed. $FAILURES$",
+    "placeholders": {
+      "restored": { "content": "$1" }, "total_tabs": { "content": "$2" },
+      "failed": { "content": "$3" }, "failures": { "content": "$4" }
+    }
+  },
+  "undoGroupPartial": {
+    "message": "Ungrouped $RESTORED$ of $TOTAL_TABS$. $FAILED$ could not be reversed. $FAILURES$",
+    "placeholders": {
+      "restored": { "content": "$1" }, "total_tabs": { "content": "$2" },
+      "failed": { "content": "$3" }, "failures": { "content": "$4" }
+    }
+  },
+  "undoUngroupPartial": {
+    "message": "Regrouped $RESTORED$ of $TOTAL_TABS$ into $GROUPS$. $FAILED$ could not be reversed. $FAILURES$",
+    "placeholders": {
+      "restored": { "content": "$1" }, "total_tabs": { "content": "$2" },
+      "failed": { "content": "$3" }, "failures": { "content": "$4" },
+      "groups": { "content": "$5" }
+    }
+  },
+  "undoGatherPartial": {
+    "message": "Returned $RESTORED$ of $TOTAL_TABS$ to $WINDOWS$. $FAILED$ could not be reversed. $FAILURES$",
+    "placeholders": {
+      "restored": { "content": "$1" }, "total_tabs": { "content": "$2" },
+      "failed": { "content": "$3" }, "failures": { "content": "$4" },
+      "windows": { "content": "$5" }
+    }
+  },
+  "undoOrganizationPartial": {
+    "message": "Undid the latest tab organization change for $RESTORED$ of $TOTAL_TABS$. $FAILED$ could not be reversed. $FAILURES$",
+    "placeholders": {
+      "restored": { "content": "$1" }, "total_tabs": { "content": "$2" },
+      "failed": { "content": "$3" }, "failures": { "content": "$4" }
+    }
+  },
+  "undoSortFailed": {
+    "message": "Could not undo the previous tab order. $FAILURES$",
+    "placeholders": { "failures": { "content": "$1" } }
+  },
+  "undoGroupFailed": {
+    "message": "Could not undo grouping these tabs. $FAILURES$",
+    "placeholders": { "failures": { "content": "$1" } }
+  },
+  "undoUngroupFailed": {
+    "message": "Could not undo regrouping these tabs. $FAILURES$",
+    "placeholders": { "failures": { "content": "$1" } }
+  },
+  "undoGatherFailed": {
+    "message": "Could not undo returning these tabs to their source windows. $FAILURES$",
+    "placeholders": { "failures": { "content": "$1" } }
+  },
+  "undoOrganizationFailed": {
+    "message": "Could not undo the latest tab organization change. $FAILURES$",
+    "placeholders": { "failures": { "content": "$1" } }
   }
 }

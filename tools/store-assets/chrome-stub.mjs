@@ -81,9 +81,15 @@ globalThis.chrome = {
     move() {
       return Promise.resolve();
     },
+    update() {
+      return Promise.resolve();
+    },
     create() {},
   },
   tabGroups: {
+    get(groupId) {
+      return Promise.resolve(groupTitles.get(groupId) || {});
+    },
     update(groupId, properties) {
       groupTitles.set(groupId, properties);
       return Promise.resolve();
@@ -104,8 +110,30 @@ let transaction = null;
 
 function handleBackgroundMessage(message) {
   switch (message.type) {
+    case "GET_UNDO_TRANSACTION":
     case "GET_DUPLICATE_CLEANUP_UNDO":
-      return { ok: true, transaction };
+      return {
+        ok: true,
+        transaction: transaction?.operation
+          ? summarizeUndoTransaction()
+          : transaction,
+      };
+    case "BEGIN_UNDO_OPERATION":
+      transaction = {
+        id: "operation-1",
+        operation: message.operation,
+        data: normalizeUndoData(message.operation, message.data),
+      };
+      return { ok: true, transaction: summarizeUndoTransaction() };
+    case "UPDATE_UNDO_OPERATION":
+      transaction = {
+        ...transaction,
+        data: {
+          ...transaction.data,
+          ...message.data,
+        },
+      };
+      return { ok: true, transaction: summarizeUndoTransaction() };
     case "BEGIN_DUPLICATE_CLEANUP":
       transaction = { id: "cleanup-1", count: 0 };
       return { ok: true, transaction };
@@ -129,6 +157,61 @@ function handleBackgroundMessage(message) {
     default:
       return { ok: true, transaction };
   }
+}
+
+function normalizeUndoData(operation, data = {}) {
+  if (operation === "group-tabs") {
+    return {
+      groups: (data.groups || []).map((group) => ({
+        ...group,
+        groupId: Number.isInteger(group.groupId) ? group.groupId : null,
+        state: group.state || "planned",
+      })),
+    };
+  }
+
+  if (operation === "gather-tabs-here") {
+    return {
+      tabs: (data.tabs || []).map((tab) => ({
+        ...tab,
+        state: tab.state || "pending",
+      })),
+    };
+  }
+
+  return { ...data };
+}
+
+function summarizeUndoTransaction() {
+  const data = transaction.data || {};
+  let count = 0;
+  const summary = {
+    id: transaction.id,
+    count: 0,
+    operation: transaction.operation,
+  };
+
+  if (transaction.operation === "sort-by-domain") {
+    count = (data.tabs || []).length;
+  } else if (transaction.operation === "group-tabs") {
+    const groups = (data.groups || []).filter((group) =>
+      Number.isInteger(group.groupId),
+    );
+    count = groups.reduce((total, group) => total + group.tabIds.length, 0);
+    summary.groupCount = groups.length;
+  } else if (transaction.operation === "ungroup-tabs") {
+    const groups = data.groups || [];
+    count = groups.reduce((total, group) => total + group.tabIds.length, 0);
+    summary.groupCount = groups.length;
+  } else if (transaction.operation === "gather-tabs-here") {
+    const tabs = (data.tabs || []).filter((tab) => tab.state === "moved");
+    count = tabs.length;
+    summary.windowCount = new Set(
+      tabs.map((tab) => tab.sourceWindowId),
+    ).size;
+  }
+
+  return { ...summary, count };
 }
 
 // The popup moves focus when views change, which paints focus rings that imply

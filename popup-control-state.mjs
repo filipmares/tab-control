@@ -1,4 +1,4 @@
-import { createPluralMessage } from "./i18n.mjs";
+import { createMessage, createPluralMessage } from "./i18n.mjs";
 
 const GROUP_ACTION_COPY = {
   group: {
@@ -53,15 +53,60 @@ export function getRecentControlState(state) {
 
 export function getUndoControlState(state) {
   const count = state.undoTransaction?.count || 0;
+  const operation = state.undoTransaction?.operation || "duplicate-cleanup";
 
   if (count === 0) {
     return { hidden: true, disabled: state.busy, text: null, ariaLabel: null };
   }
 
+  const copy = getUndoCopy(operation, state.undoTransaction);
+
   return {
     hidden: false,
     disabled: state.busy,
-    text: createPluralMessage("closedTabs", count),
-    ariaLabel: createPluralMessage("undoClosedTabs", count),
+    text: copy.text,
+    ariaLabel: copy.ariaLabel,
   };
+}
+
+function getUndoCopy(operation, summary) {
+  const count = summary.count;
+  const tabs = createPluralMessage("tabCount", count);
+
+  switch (operation) {
+    case "sort-by-domain":
+      return {
+        text: createMessage("undoSortText", [tabs]),
+        ariaLabel: createMessage("undoSortLabel", [tabs]),
+      };
+    case "group-tabs": {
+      const groupCount = summary.groupCount || 0;
+      const groups = createPluralMessage("groupCount", groupCount);
+      return {
+        text: createMessage("undoGroupText", [tabs, groups]),
+        ariaLabel: createMessage("undoGroupLabel", [tabs, groups]),
+      };
+    }
+    case "ungroup-tabs": {
+      const groupCount = summary.groupCount || 0;
+      const groups = createPluralMessage("groupCount", groupCount);
+      return {
+        text: createMessage("undoUngroupText", [tabs, groups]),
+        ariaLabel: createMessage("undoUngroupLabel", [tabs, groups]),
+      };
+    }
+    case "gather-tabs-here": {
+      const windowCount = summary.windowCount || 0;
+      const windows = createPluralMessage("windowCount", windowCount);
+      return {
+        text: createMessage("undoGatherText", [tabs, windows]),
+        ariaLabel: createMessage("undoGatherLabel", [tabs, windows]),
+      };
+    }
+    default:
+      return {
+        text: createPluralMessage("closedTabs", count),
+        ariaLabel: createPluralMessage("undoClosedTabs", count),
+      };
+  }
 }

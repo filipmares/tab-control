@@ -35,15 +35,28 @@ function createFakeChrome(overrides = {}) {
       tabs: {
         ...tabEvents,
         query: record("tabs.query"),
+        remove: record("tabs.remove"),
         move: record("tabs.move"),
+        update: record("tabs.update"),
         group: record("tabs.group"),
         ungroup: record("tabs.ungroup"),
         create: record("tabs.create"),
       },
-      tabGroups: { update: record("tabGroups.update") },
+      tabGroups: {
+        get: record("tabGroups.get"),
+        update: record("tabGroups.update"),
+      },
       windows: {
+        get: record("windows.get"),
         getCurrent: record("windows.getCurrent"),
         getAll: record("windows.getAll"),
+      },
+      storage: {
+        session: {
+          get: record("storage.session.get"),
+          set: record("storage.session.set"),
+          remove: record("storage.session.remove"),
+        },
       },
       runtime: { sendMessage: record("runtime.sendMessage") },
       sessions: {
@@ -68,6 +81,31 @@ test("reads tabs and windows with the popup's query shapes", async () => {
     ["tabs.query", { currentWindow: true }],
     ["windows.getCurrent"],
     ["windows.getAll", { populate: true, windowTypes: ["normal"] }],
+  ]);
+});
+
+test("adapts the background storage, tab, and window operations", async () => {
+  const chrome = createFakeChrome();
+  chrome.api.storage.session.get = (key) => {
+    chrome.calls.push(["storage.session.get", key]);
+    return Promise.resolve({ [key]: "value" });
+  };
+  const adapter = createChromeAdapter(chrome.api);
+
+  assert.equal(await adapter.getSessionValue("key"), "value");
+  await adapter.setSessionValue("key", "value");
+  await adapter.removeSessionValue("key");
+  await adapter.removeTab(7);
+  await adapter.getWindow(3);
+  await adapter.queryWindowTabs(3);
+
+  assert.deepEqual(chrome.calls, [
+    ["storage.session.get", "key"],
+    ["storage.session.set", { key: "value" }],
+    ["storage.session.remove", "key"],
+    ["tabs.remove", 7],
+    ["windows.get", 3],
+    ["tabs.query", { windowId: 3 }],
   ]);
 });
 
@@ -135,15 +173,19 @@ test("edits tabs and groups through the Chrome surface", async () => {
 
   await adapter.moveTabs([7, 9], 2);
   await adapter.moveTabsToWindow([7, 8], 3);
+  await adapter.setTabPinned(7, true);
   await adapter.groupTabs([7, 8]);
+  await adapter.getTabGroup(4);
   await adapter.updateTabGroup(4, { title: "example.com" });
   await adapter.ungroupTabs([7, 8]);
-  await adapter.createTab("https://example.test/");
+  await adapter.createTab({ url: "https://example.test/" });
 
   assert.deepEqual(chrome.calls, [
     ["tabs.move", [7, 9], { index: 2 }],
     ["tabs.move", [7, 8], { windowId: 3, index: -1 }],
+    ["tabs.update", 7, { pinned: true }],
     ["tabs.group", { tabIds: [7, 8] }],
+    ["tabGroups.get", 4],
     ["tabGroups.update", 4, { title: "example.com" }],
     ["tabs.ungroup", [7, 8]],
     ["tabs.create", { url: "https://example.test/" }],
