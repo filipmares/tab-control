@@ -13,7 +13,11 @@ const GROUP_COLORS = [
 const GROUP_TITLE_LIMIT = 24;
 
 export function pluralize(word, count) {
-  return count === 1 ? word : `${word}s`;
+  if (count === 1) {
+    return word;
+  }
+
+  return /(?:s|x|z|ch|sh)$/.test(word) ? `${word}es` : `${word}s`;
 }
 
 export function formatSummary(summary, partialGroupCount) {
@@ -114,7 +118,7 @@ export function formatRestorationOutcome(outcome) {
   switch (outcome.status) {
     case "restored": {
       const detail = outcome.recreated > 0
-        ? ` ${outcome.recreated} ${pluralize("tab", outcome.recreated)} reopened from saved ${pluralizeAddress(outcome.recreated)} because Chrome no longer had browsing history.`
+        ? ` ${outcome.recreated} ${pluralize("tab", outcome.recreated)} reopened from saved ${pluralize("address", outcome.recreated)} because Chrome no longer had browsing history.`
         : " Browsing history was restored.";
 
       return {
@@ -124,7 +128,7 @@ export function formatRestorationOutcome(outcome) {
     }
     case "partial": {
       const detail = outcome.recreated > 0
-        ? ` ${outcome.recreated} restored ${pluralize("tab", outcome.recreated)} reopened from saved ${pluralizeAddress(outcome.recreated)} without browsing history.`
+        ? ` ${outcome.recreated} restored ${pluralize("tab", outcome.recreated)} reopened from saved ${pluralize("address", outcome.recreated)} without browsing history.`
         : "";
 
       return {
@@ -143,8 +147,4 @@ export function formatRestorationOutcome(outcome) {
     default:
       return { message: "Undo is no longer available.", tone: "error" };
   }
-}
-
-function pluralizeAddress(count) {
-  return count === 1 ? "address" : "addresses";
 }
