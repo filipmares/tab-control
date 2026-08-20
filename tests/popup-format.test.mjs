@@ -160,6 +160,69 @@ test("falls back when the outcome status is unknown", () => {
   });
 });
 
+test("treats every expired organizing undo as unavailable rather than failed", () => {
+  for (const operation of [
+    "sort-by-domain",
+    "group-tabs",
+    "ungroup-tabs",
+    "gather-tabs-here",
+  ]) {
+    assert.deepEqual(
+      formatRestorationOutcome({ status: "expired" }, operation),
+      { message: "Undo is no longer available.", tone: "error" },
+      operation,
+    );
+  }
+});
+
+test("uses distinct direct messages for each organizing undo", () => {
+  assert.equal(
+    formatRestorationOutcome(
+      { status: "restored", restored: 12 },
+      "sort-by-domain",
+    ).message,
+    "Restored the previous order of 12 tabs.",
+  );
+  assert.equal(
+    formatRestorationOutcome(
+      { status: "restored", restored: 12 },
+      "group-tabs",
+    ).message,
+    "Ungrouped 12 tabs.",
+  );
+  assert.equal(
+    formatRestorationOutcome(
+      { status: "restored", restored: 12, groupCount: 4 },
+      "ungroup-tabs",
+    ).message,
+    "Regrouped 12 tabs into 4 domain groups.",
+  );
+  assert.equal(
+    formatRestorationOutcome(
+      { status: "restored", restored: 9, windowCount: 2 },
+      "gather-tabs-here",
+    ).message,
+    "Returned 9 tabs to 2 windows.",
+  );
+});
+
+test("describes warning-only gather partial outcomes without a fake failure count", () => {
+  assert.equal(
+    formatRestorationOutcome(
+      {
+        status: "partial",
+        restored: 9,
+        total: 9,
+        failed: 0,
+        windowCount: 2,
+        failures: ["Source window 7 was closed."],
+      },
+      "gather-tabs-here",
+    ).message,
+    "Returned 9 tabs to a surviving window, but the original window was unavailable. Source window 7 was closed.",
+  );
+});
+
 test("reports the duplicate cleanup outcome", () => {
   assert.deepEqual(
     formatDuplicateCleanupOutcome({

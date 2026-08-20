@@ -57,8 +57,14 @@ export function createChromeAdapter(api) {
     moveTabsToWindow(tabIds, windowId) {
       return api.tabs.move(tabIds, { windowId, index: -1 });
     },
+    setTabPinned(tabId, pinned) {
+      return api.tabs.update(tabId, { pinned });
+    },
     groupTabs(tabIds) {
       return api.tabs.group({ tabIds });
+    },
+    getTabGroup(groupId) {
+      return api.tabGroups.get(groupId);
     },
     updateTabGroup(groupId, properties) {
       return api.tabGroups.update(groupId, properties);

@@ -37,11 +37,15 @@ function createFakeChrome(overrides = {}) {
         query: record("tabs.query"),
         remove: record("tabs.remove"),
         move: record("tabs.move"),
+        update: record("tabs.update"),
         group: record("tabs.group"),
         ungroup: record("tabs.ungroup"),
         create: record("tabs.create"),
       },
-      tabGroups: { update: record("tabGroups.update") },
+      tabGroups: {
+        get: record("tabGroups.get"),
+        update: record("tabGroups.update"),
+      },
       windows: {
         get: record("windows.get"),
         getCurrent: record("windows.getCurrent"),
@@ -169,7 +173,9 @@ test("edits tabs and groups through the Chrome surface", async () => {
 
   await adapter.moveTabs([7, 9], 2);
   await adapter.moveTabsToWindow([7, 8], 3);
+  await adapter.setTabPinned(7, true);
   await adapter.groupTabs([7, 8]);
+  await adapter.getTabGroup(4);
   await adapter.updateTabGroup(4, { title: "example.com" });
   await adapter.ungroupTabs([7, 8]);
   await adapter.createTab({ url: "https://example.test/" });
@@ -177,7 +183,9 @@ test("edits tabs and groups through the Chrome surface", async () => {
   assert.deepEqual(chrome.calls, [
     ["tabs.move", [7, 9], { index: 2 }],
     ["tabs.move", [7, 8], { windowId: 3, index: -1 }],
+    ["tabs.update", 7, { pinned: true }],
     ["tabs.group", { tabIds: [7, 8] }],
+    ["tabGroups.get", 4],
     ["tabGroups.update", 4, { title: "example.com" }],
     ["tabs.ungroup", [7, 8]],
     ["tabs.create", { url: "https://example.test/" }],

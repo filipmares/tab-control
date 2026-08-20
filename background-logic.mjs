@@ -10,12 +10,15 @@ import {
   markTabRestored,
   queueClosedTabs,
   reopenUndoTransaction,
+  UNDO_OPERATION,
   UNDO_RESTORATION_METHOD,
   UNDO_TRANSACTION_STATE,
+  updateOperationData,
 } from "./undo-logic.mjs";
 
-const STORAGE_KEY = "latestDuplicateCleanup";
+const STORAGE_KEY = "latestUndoOperation";
 const RECENT_SESSION_CAPTURE_LIMIT = 25;
+const OPERATION_KINDS = new Set(Object.values(UNDO_OPERATION));
 
 export function createBackgroundMessageListener(browser) {
   const handleMessage = createBackgroundMessageHandler(browser);
@@ -38,30 +41,53 @@ export function createBackgroundMessageHandler(browser) {
   async function handleMessage(message) {
     switch (message?.type) {
       case "BEGIN_DUPLICATE_CLEANUP":
-        return beginDuplicateCleanup(message.windowId);
+        return beginUndoOperation(
+          UNDO_OPERATION.DUPLICATE_CLEANUP,
+          message.windowId,
+        );
       case "CLOSE_CLEANUP_TABS":
         return closeCleanupTabs(message.transactionId, message.tabs);
+      case "BEGIN_UNDO_OPERATION":
+        return beginUndoOperation(
+          message.operation,
+          message.windowId,
+          message.data,
+        );
+      case "UPDATE_UNDO_OPERATION":
+        return updateUndoOperation(message.transactionId, message.data);
       case "GET_DUPLICATE_CLEANUP_UNDO":
-        return {
-          transaction: getUndoTransactionSummary(await readTransaction()),
-        };
+      case "GET_UNDO_TRANSACTION":
+        return { transaction: getUndoTransactionSummary(await readTransaction()) };
       case "RESTORE_DUPLICATE_CLEANUP":
-        return restoreDuplicateCleanup(message.transactionId);
+      case "RESTORE_UNDO_TRANSACTION":
+        return restoreUndoTransaction(message.transactionId);
       default:
         throw new Error("Unknown Tab Control message.");
     }
   }
 
-  async function beginDuplicateCleanup(windowId) {
+  async function beginUndoOperation(operation, windowId, data = {}) {
+    if (!OPERATION_KINDS.has(operation)) {
+      throw new Error("Unknown undo operation.");
+    }
+
     const transaction = createUndoTransaction({
       id: browser.generateId(),
       windowId,
+      operation,
+      data,
     });
     await saveTransaction(transaction);
 
-    return {
-      transaction: getClientTransaction(transaction),
-    };
+    return { transaction: getClientTransaction(transaction) };
+  }
+
+  async function updateUndoOperation(transactionId, data = {}) {
+    const transaction = await getOpenTransaction(transactionId);
+    const updated = updateOperationData(transaction, data);
+    await saveTransaction(updated);
+
+    return { transaction: getClientTransaction(updated) };
   }
 
   async function closeCleanupTabs(transactionId, tabs = []) {
@@ -112,7 +138,7 @@ export function createBackgroundMessageHandler(browser) {
     };
   }
 
-  async function restoreDuplicateCleanup(transactionId) {
+  async function restoreUndoTransaction(transactionId) {
     const transaction = await readTransaction();
 
     if (
@@ -139,19 +165,16 @@ export function createBackgroundMessageHandler(browser) {
     await saveTransaction(claimedTransaction);
     const errors = [];
 
-    for (const tab of claimedTransaction.tabs) {
-      try {
-        const restoration = await restoreTab(tab);
-        claimedTransaction = markTabRestored(
-          claimedTransaction,
-          tab.originalTabId,
-          restoration.restoredTabId,
-          restoration.method,
-        );
-        await saveTransaction(claimedTransaction);
-      } catch (error) {
-        errors.push(getErrorMessage(error));
-      }
+    if (getOperation(claimedTransaction) === UNDO_OPERATION.DUPLICATE_CLEANUP) {
+      claimedTransaction = await restoreClosedTabs(
+        claimedTransaction,
+        errors,
+      );
+    } else {
+      claimedTransaction = await restoreOperation(
+        claimedTransaction,
+        errors,
+      );
     }
 
     const outcome = getRestorationOutcome(claimedTransaction, errors);
@@ -172,6 +195,325 @@ export function createBackgroundMessageHandler(browser) {
       outcome,
       transaction: null,
     };
+  }
+
+  async function restoreClosedTabs(transaction, errors) {
+    let current = transaction;
+
+    for (const tab of current.tabs) {
+      try {
+        const restoration = await restoreTab(tab);
+        current = markTabRestored(
+          current,
+          tab.originalTabId,
+          restoration.restoredTabId,
+          restoration.method,
+        );
+        await saveTransaction(current);
+      } catch (error) {
+        errors.push(getErrorMessage(error));
+      }
+    }
+
+    return current;
+  }
+
+  async function restoreOperation(transaction, errors) {
+    switch (getOperation(transaction)) {
+      case UNDO_OPERATION.SORT_BY_DOMAIN:
+        return restoreSortedTabs(transaction);
+      case UNDO_OPERATION.GROUP_TABS:
+        return restoreCreatedGroups(transaction);
+      case UNDO_OPERATION.UNGROUP_TABS:
+        return restoreDissolvedGroups(transaction);
+      case UNDO_OPERATION.GATHER_TABS_HERE:
+        return restoreGatheredTabs(transaction);
+      default:
+        errors.push("Unknown undo operation.");
+        return transaction;
+    }
+  }
+
+  async function restoreSortedTabs(transaction) {
+    let current = transaction;
+    const tabs = [...(current.data?.tabs || [])].sort(
+      (left, right) => left.index - right.index,
+    );
+
+    for (const captured of tabs) {
+      let windows;
+      try {
+        windows = await browser.getNormalWindows();
+      } catch (error) {
+        current = markOperationTabFailed(
+          current,
+          captured.tabId,
+          `Could not inspect windows while restoring tab ${captured.tabId}: ${getErrorMessage(error)}`,
+        );
+        await saveTransaction(current);
+        continue;
+      }
+      const currentTab = findTab(windows, captured.tabId);
+      const targetWindow = windows.find(
+        (window) => window.id === captured.windowId,
+      );
+
+      if (!currentTab) {
+        current = markOperationTabFailed(
+          current,
+          captured.tabId,
+          `Tab ${captured.tabId} is no longer open.`,
+        );
+        await saveTransaction(current);
+        continue;
+      }
+
+      if (!targetWindow) {
+        current = markOperationTabFailed(
+          current,
+          captured.tabId,
+          `Window ${captured.windowId} is no longer available.`,
+        );
+        await saveTransaction(current);
+        continue;
+      }
+
+      try {
+        if (currentTab.windowId !== targetWindow.id) {
+          await browser.moveTabsToWindow([captured.tabId], targetWindow.id);
+        }
+
+        if (Boolean(currentTab.pinned) !== captured.pinned) {
+          await browser.setTabPinned(captured.tabId, captured.pinned);
+        }
+
+        await browser.moveTabs([captured.tabId], captured.index);
+        current = markOperationTabRestored(current, captured.tabId);
+      } catch (error) {
+        current = markOperationTabFailed(
+          current,
+          captured.tabId,
+          `Tab ${captured.tabId}: ${getErrorMessage(error)}`,
+        );
+      }
+
+      await saveTransaction(current);
+    }
+
+    return current;
+  }
+
+  async function restoreCreatedGroups(transaction) {
+    let current = transaction;
+
+    for (const [groupIndex, group] of (current.data?.groups || []).entries()) {
+      if (!Number.isInteger(group.groupId)) {
+        continue;
+      }
+
+      let windows;
+      try {
+        windows = await browser.getNormalWindows();
+      } catch (error) {
+        current = markGroupResult(
+          current,
+          groupIndex,
+          [],
+          group.tabIds,
+          `Could not inspect windows while restoring the domain group: ${getErrorMessage(error)}`,
+        );
+        await saveTransaction(current);
+        continue;
+      }
+      const currentTabs = new Map(
+        group.tabIds.map((tabId) => [tabId, findTab(windows, tabId)]),
+      );
+      const missingTabIds = group.tabIds.filter(
+        (tabId) => !currentTabs.get(tabId),
+      );
+      const alreadyUngroupedTabIds = group.tabIds.filter((tabId) => {
+        const tab = currentTabs.get(tabId);
+        return tab && (!Number.isInteger(tab.groupId) || tab.groupId < 0);
+      });
+      const capturedGroupTabIds = group.tabIds.filter((tabId) => {
+        const tab = currentTabs.get(tabId);
+        return tab && tab.groupId === group.groupId;
+      });
+      const conflictingTabIds = group.tabIds.filter((tabId) => {
+        const tab = currentTabs.get(tabId);
+        return (
+          tab &&
+          Number.isInteger(tab.groupId) &&
+          tab.groupId >= 0 &&
+          tab.groupId !== group.groupId
+        );
+      });
+      const failedTabIds = [...missingTabIds, ...conflictingTabIds];
+
+      try {
+        if (capturedGroupTabIds.length > 0) {
+          await browser.ungroupTabs(capturedGroupTabIds);
+        }
+        current = markGroupResult(
+          current,
+          groupIndex,
+          [...alreadyUngroupedTabIds, ...capturedGroupTabIds],
+          failedTabIds,
+          failedTabIds.length > 0
+            ? `Tabs ${failedTabIds.join(", ")} could not be safely ungrouped.`
+            : null,
+        );
+      } catch (error) {
+        current = markGroupResult(
+          current,
+          groupIndex,
+          alreadyUngroupedTabIds,
+          [...failedTabIds, ...capturedGroupTabIds],
+          `Could not ungroup the created domain group: ${getErrorMessage(error)}`,
+        );
+      }
+
+      await saveTransaction(current);
+    }
+
+    return current;
+  }
+
+  async function restoreDissolvedGroups(transaction) {
+    let current = transaction;
+
+    for (const [groupIndex, group] of (current.data?.groups || []).entries()) {
+      let windows;
+      try {
+        windows = await browser.getNormalWindows();
+      } catch (error) {
+        current = markGroupResult(
+          current,
+          groupIndex,
+          [],
+          group.tabIds,
+          `Could not inspect windows while recreating the domain group: ${getErrorMessage(error)}`,
+        );
+        await saveTransaction(current);
+        continue;
+      }
+      const presentTabIds = group.tabIds.filter((tabId) =>
+        Boolean(findTab(windows, tabId)),
+      );
+      const missingTabIds = group.tabIds.filter(
+        (tabId) => !presentTabIds.includes(tabId),
+      );
+
+      try {
+        if (presentTabIds.length === 0) {
+          throw new Error("No members of the dissolved group are still open.");
+        }
+
+        const groupId = await browser.groupTabs(presentTabIds);
+        await browser.updateTabGroup(groupId, {
+          title: group.title,
+          color: group.color,
+          collapsed: group.collapsed,
+        });
+        current = markGroupResult(
+          current,
+          groupIndex,
+          presentTabIds,
+          missingTabIds,
+          missingTabIds.length > 0
+            ? `Tabs ${missingTabIds.join(", ")} are no longer open.`
+            : null,
+        );
+      } catch (error) {
+        current = markGroupResult(
+          current,
+          groupIndex,
+          [],
+          group.tabIds,
+          `Could not recreate the dissolved domain group: ${getErrorMessage(error)}`,
+        );
+      }
+
+      await saveTransaction(current);
+    }
+
+    return current;
+  }
+
+  async function restoreGatheredTabs(transaction) {
+    let current = transaction;
+
+    for (const captured of current.data?.tabs || []) {
+      if (captured.state !== "moved") {
+        continue;
+      }
+
+      let windows;
+      try {
+        windows = await browser.getNormalWindows();
+      } catch (error) {
+        current = markOperationTabFailed(
+          current,
+          captured.tabId,
+          `Could not inspect windows while restoring tab ${captured.tabId}: ${getErrorMessage(error)}`,
+        );
+        await saveTransaction(current);
+        continue;
+      }
+      const currentTab = findTab(windows, captured.tabId);
+      const sourceWindow = windows.find(
+        (window) => window.id === captured.sourceWindowId,
+      );
+      const destinationWindow =
+        sourceWindow ||
+        chooseGatherFallbackWindow(
+          windows,
+          current.windowId,
+          captured.incognito,
+        );
+
+      if (!currentTab) {
+        current = markOperationTabFailed(
+          current,
+          captured.tabId,
+          `Tab ${captured.tabId} is no longer open.`,
+        );
+        await saveTransaction(current);
+        continue;
+      }
+
+      if (!destinationWindow) {
+        current = markOperationTabFailed(
+          current,
+          captured.tabId,
+          `Source window ${captured.sourceWindowId} is gone and no normal window remains.`,
+        );
+        await saveTransaction(current);
+        continue;
+      }
+
+      try {
+        await browser.moveTabsToWindow([captured.tabId], destinationWindow.id);
+        await browser.moveTabs([captured.tabId], captured.index);
+        current = markOperationTabRestored(
+          current,
+          captured.tabId,
+          sourceWindow
+            ? null
+            : `Source window ${captured.sourceWindowId} was closed; moved tab ${captured.tabId} to surviving window ${destinationWindow.id}.`,
+        );
+      } catch (error) {
+        current = markOperationTabFailed(
+          current,
+          captured.tabId,
+          `Tab ${captured.tabId}: ${getErrorMessage(error)}`,
+        );
+      }
+
+      await saveTransaction(current);
+    }
+
+    return current;
   }
 
   async function restoreTab(snapshot) {
@@ -291,12 +633,12 @@ export function createBackgroundMessageHandler(browser) {
     return transaction;
   }
 
-  async function readTransaction() {
-    return (await browser.getSessionValue(STORAGE_KEY)) || null;
-  }
-
   function saveTransaction(transaction) {
     return browser.setSessionValue(STORAGE_KEY, transaction);
+  }
+
+  async function readTransaction() {
+    return (await browser.getSessionValue(STORAGE_KEY)) || null;
   }
 
   function getClientTransaction(transaction) {
@@ -305,6 +647,9 @@ export function createBackgroundMessageHandler(browser) {
         id: transaction.id,
         count: 0,
         createdAt: transaction.createdAt,
+        ...(getOperation(transaction) === UNDO_OPERATION.DUPLICATE_CLEANUP
+          ? {}
+          : { operation: getOperation(transaction) }),
       }
     );
   }
@@ -318,6 +663,77 @@ export function createBackgroundMessageHandler(browser) {
   }
 
   return handleMessage;
+}
+
+function markOperationTabRestored(transaction, tabId, warning = null) {
+  return updateOperationData(transaction, {
+    tabs: transaction.data.tabs.map((tab) =>
+      tab.tabId === tabId
+        ? { ...tab, state: "restored", warning }
+        : tab,
+    ),
+  });
+}
+
+function markOperationTabFailed(transaction, tabId, failure) {
+  return updateOperationData(transaction, {
+    tabs: transaction.data.tabs.map((tab) =>
+      tab.tabId === tabId ? { ...tab, state: "failed", failure } : tab,
+    ),
+  });
+}
+
+function markGroupResult(
+  transaction,
+  groupIndex,
+  restoredTabIds,
+  failedTabIds,
+  failure,
+) {
+  return updateOperationData(transaction, {
+    groups: transaction.data.groups.map((group, index) =>
+      index === groupIndex
+        ? {
+            ...group,
+            restoredTabIds,
+            failedTabIds,
+            failure,
+          }
+        : group,
+    ),
+  });
+}
+
+function chooseGatherFallbackWindow(windows, targetWindowId, incognito) {
+  const compatibleWindows = windows.filter(
+    (window) => Boolean(window.incognito) === Boolean(incognito),
+  );
+
+  return (
+    compatibleWindows.find((window) => window.id === targetWindowId) ||
+    [...compatibleWindows].sort((left, right) => {
+      const leftDistance = Math.abs(left.id - targetWindowId);
+      const rightDistance = Math.abs(right.id - targetWindowId);
+      return leftDistance - rightDistance;
+    })[0] ||
+    null
+  );
+}
+
+function findTab(windows, tabId) {
+  for (const window of windows) {
+    const tab = (window.tabs || []).find((candidate) => candidate.id === tabId);
+
+    if (tab) {
+      return { ...tab, windowId: window.id };
+    }
+  }
+
+  return null;
+}
+
+function getOperation(transaction) {
+  return transaction?.operation || UNDO_OPERATION.DUPLICATE_CLEANUP;
 }
 
 function getErrorMessage(error) {

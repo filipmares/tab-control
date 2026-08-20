@@ -196,3 +196,49 @@ test("describes the undo offer for the closed tab count", () => {
     },
   );
 });
+
+test("describes the undo offer for each organizing operation", () => {
+  assert.deepEqual(
+    getUndoControlState(
+      popupState({
+        undoTransaction: {
+          id: "sort",
+          count: 42,
+          operation: "sort-by-domain",
+        },
+      }),
+    ),
+    {
+      hidden: false,
+      disabled: false,
+      text: "Sorted 42 tabs",
+      ariaLabel: "Undo sorting and restore the previous order of 42 tabs",
+    },
+  );
+  assert.equal(
+    getUndoControlState(
+      popupState({
+        undoTransaction: {
+          id: "group",
+          count: 12,
+          groupCount: 4,
+          operation: "group-tabs",
+        },
+      }),
+    ).text,
+    "Grouped 12 tabs into 4 groups",
+  );
+  assert.equal(
+    getUndoControlState(
+      popupState({
+        undoTransaction: {
+          id: "gather",
+          count: 9,
+          windowCount: 2,
+          operation: "gather-tabs-here",
+        },
+      }),
+    ).text,
+    "Gathered 9 tabs from 2 windows",
+  );
+});
