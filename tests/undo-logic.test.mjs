@@ -12,10 +12,16 @@ import {
   getUndoTransactionSummary,
   markTabClosed,
   markTabRestored,
+  queueGatheredTabs,
+  queueGroupedTabs,
+  queueSortedTabs,
+  queueUngroupedTabs,
   queueClosedTabs,
   reopenUndoTransaction,
+  UNDO_OPERATION,
   UNDO_RESTORATION_METHOD,
   UNDO_TRANSACTION_STATE,
+  updateOperationData,
 } from "../undo-logic.mjs";
 
 test("queues recoverable tab snapshots once without exposing pending closures", () => {
@@ -305,6 +311,119 @@ test("reports full, partial, and failed restoration outcomes", () => {
     historyRestored: 1,
     recreated: 1,
     failed: 0,
+    error: null,
+  });
+});
+
+test("constructs summaries for every organizing operation", () => {
+  const sort = queueSortedTabs(
+    createUndoTransaction({
+      id: "sort-1",
+      windowId: 5,
+      operation: UNDO_OPERATION.SORT_BY_DOMAIN,
+    }),
+    [
+      { tabId: 1, windowId: 5, index: 0 },
+      { tabId: 2, windowId: 5, index: 1 },
+    ],
+  );
+  const group = queueGroupedTabs(
+    createUndoTransaction({
+      id: "group-1",
+      windowId: 5,
+      operation: UNDO_OPERATION.GROUP_TABS,
+    }),
+    [
+      { groupId: 10, tabIds: [1, 2] },
+      { groupId: 11, tabIds: [3, 4, 5] },
+    ],
+  );
+  const ungroup = queueUngroupedTabs(
+    createUndoTransaction({
+      id: "ungroup-1",
+      windowId: 5,
+      operation: UNDO_OPERATION.UNGROUP_TABS,
+    }),
+    [{ groupId: 10, title: "example.com", color: "blue", tabIds: [1, 2] }],
+  );
+  let gather = queueGatheredTabs(
+    createUndoTransaction({
+      id: "gather-1",
+      windowId: 5,
+      operation: UNDO_OPERATION.GATHER_TABS_HERE,
+    }),
+    [
+      { tabId: 1, sourceWindowId: 7, index: 0 },
+      { tabId: 2, sourceWindowId: 8, index: 1 },
+    ],
+  );
+  gather = updateOperationData(gather, {
+    tabs: gather.data.tabs.map((tab) => ({ ...tab, state: "moved" })),
+  });
+
+  assert.deepEqual(getUndoTransactionSummary(sort), {
+    id: "sort-1",
+    count: 2,
+    createdAt: sort.createdAt,
+    operation: "sort-by-domain",
+  });
+  assert.deepEqual(getUndoTransactionSummary(group), {
+    id: "group-1",
+    count: 5,
+    groupCount: 2,
+    createdAt: group.createdAt,
+    operation: "group-tabs",
+  });
+  assert.deepEqual(getUndoTransactionSummary(ungroup), {
+    id: "ungroup-1",
+    count: 2,
+    groupCount: 1,
+    createdAt: ungroup.createdAt,
+    operation: "ungroup-tabs",
+  });
+  assert.deepEqual(getUndoTransactionSummary(gather), {
+    id: "gather-1",
+    count: 2,
+    windowCount: 2,
+    createdAt: gather.createdAt,
+    operation: "gather-tabs-here",
+  });
+});
+
+test("plans partial reversals and names gather fallback warnings", () => {
+  let transaction = queueGatheredTabs(
+    createUndoTransaction({
+      id: "gather-2",
+      windowId: 5,
+      operation: UNDO_OPERATION.GATHER_TABS_HERE,
+    }),
+    [
+      { tabId: 1, sourceWindowId: 7, index: 0 },
+      { tabId: 2, sourceWindowId: 8, index: 1 },
+    ],
+  );
+  transaction = updateOperationData(transaction, {
+    tabs: [
+      {
+        ...transaction.data.tabs[0],
+        state: "restored",
+        warning: "Source window 7 was closed; moved tab 1 to surviving window 5.",
+      },
+      { ...transaction.data.tabs[1], state: "failed", failure: "Tab 2 is gone." },
+    ],
+  });
+
+  assert.deepEqual(getRestorationOutcome(transaction), {
+    operation: "gather-tabs-here",
+    status: "partial",
+    total: 2,
+    restored: 1,
+    failed: 1,
+    windowCount: 2,
+    failures: [
+      "Tab 2 is gone.",
+      "Source window 7 was closed; moved tab 1 to surviving window 5.",
+    ],
     error: null,
   });
 });

@@ -22,16 +22,17 @@
 
 - **Close duplicates:** closes exact matches automatically and presents similar
   same-origin paths for review. Review can be stopped at any time without
-  changing the remaining matches. The latest cleanup can be undone as one
-  transaction until another cleanup starts or the browser session ends. Undo
-  uses Chrome's session restore to preserve browsing history when available,
-  with an address-only fallback for expired session entries.
+  changing the remaining matches. The latest cleanup or organization action
+  can be undone as one transaction until another action starts or the browser
+  session ends. Undo uses Chrome's session restore to preserve browsing history
+  when available, with an address-only fallback for expired session entries.
 - **Sort by domain:** orders regular tabs by domain and title while leaving
-  pinned tabs in the positions you chose.
+  pinned tabs in the positions you chose, with undo for the previous order.
 - **Toggle domain groups:** creates named Chrome tab groups, then turns into an
-  ungroup action.
+  ungroup action; both grouping and ungrouping can be undone.
 - **Gather tabs here:** appends loose tabs from other normal windows while
-  leaving pinned and grouped tabs untouched.
+  leaving pinned and grouped tabs untouched; undo returns tabs to their source
+  windows when they still exist.
 - **Recently closed:** shows up to 10 of Chrome's browser-wide recently closed
   tabs and windows and restores a selected item with Chrome's normal session
   behavior.
@@ -93,7 +94,7 @@ Tab Control requires Chrome 102 or newer.
 | `tabs` | Read tab addresses and titles, close duplicates, and move tabs. |
 | `tabGroups` | Name, color, create, and remove native Chrome tab groups. |
 | `sessions` | Read and restore Chrome's browser-wide recently closed tabs and windows. |
-| `storage` | Keep the latest duplicate-cleanup transaction in memory for Undo during the current browser session. |
+| `storage` | Keep the latest cleanup or organization transaction in memory for Undo during the current browser session. |
 
 The Recently closed view reflects Chrome-wide session history, including items
 not closed by Tab Control. It is not a separate Tab Control history. Undo state,

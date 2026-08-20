@@ -6,7 +6,7 @@ import {
   createBackgroundMessageListener,
 } from "../background-logic.mjs";
 
-const STORAGE_KEY = "latestDuplicateCleanup";
+const STORAGE_KEY = "latestUndoOperation";
 
 function createFakeBrowser() {
   const calls = [];
@@ -25,6 +25,17 @@ function createFakeBrowser() {
   });
   let getNormalWindowsImpl = async () => [];
   let queryWindowTabsImpl = async () => [];
+  let moveTabsImpl = async () => [];
+  let moveTabsToWindowImpl = async () => [];
+  let setTabPinnedImpl = async () => ({});
+  let groupTabsImpl = async () => 1;
+  let updateTabGroupImpl = async () => ({});
+  let ungroupTabsImpl = async () => ({});
+  let getTabGroupImpl = async () => ({
+    title: "",
+    color: "grey",
+    collapsed: false,
+  });
   let onSet;
 
   const browser = {
@@ -55,6 +66,27 @@ function createFakeBrowser() {
     },
     set queryWindowTabsImpl(value) {
       queryWindowTabsImpl = value;
+    },
+    set moveTabsImpl(value) {
+      moveTabsImpl = value;
+    },
+    set moveTabsToWindowImpl(value) {
+      moveTabsToWindowImpl = value;
+    },
+    set setTabPinnedImpl(value) {
+      setTabPinnedImpl = value;
+    },
+    set groupTabsImpl(value) {
+      groupTabsImpl = value;
+    },
+    set updateTabGroupImpl(value) {
+      updateTabGroupImpl = value;
+    },
+    set ungroupTabsImpl(value) {
+      ungroupTabsImpl = value;
+    },
+    set getTabGroupImpl(value) {
+      getTabGroupImpl = value;
     },
     set onSet(value) {
       onSet = value;
@@ -106,6 +138,34 @@ function createFakeBrowser() {
       calls.push(["queryWindowTabs", windowId]);
       return queryWindowTabsImpl(windowId);
     },
+    async moveTabs(tabIds, index) {
+      calls.push(["moveTabs", tabIds, index]);
+      return moveTabsImpl(tabIds, index);
+    },
+    async moveTabsToWindow(tabIds, windowId) {
+      calls.push(["moveTabsToWindow", tabIds, windowId]);
+      return moveTabsToWindowImpl(tabIds, windowId);
+    },
+    async setTabPinned(tabId, pinned) {
+      calls.push(["setTabPinned", tabId, pinned]);
+      return setTabPinnedImpl(tabId, pinned);
+    },
+    async groupTabs(tabIds) {
+      calls.push(["groupTabs", tabIds]);
+      return groupTabsImpl(tabIds);
+    },
+    async updateTabGroup(groupId, properties) {
+      calls.push(["updateTabGroup", groupId, properties]);
+      return updateTabGroupImpl(groupId, properties);
+    },
+    async ungroupTabs(tabIds) {
+      calls.push(["ungroupTabs", tabIds]);
+      return ungroupTabsImpl(tabIds);
+    },
+    async getTabGroup(groupId) {
+      calls.push(["getTabGroup", groupId]);
+      return getTabGroupImpl(groupId);
+    },
     async createTab(options) {
       calls.push(["createTab", options]);
       return createTabImpl(options);
@@ -128,6 +188,17 @@ async function beginTransaction(browser, listener, windowId = 5) {
     windowId,
   });
   assert.equal(response.ok, true);
+  return response.transaction;
+}
+
+async function beginOperation(handler, operation, data, windowId = 5) {
+  const response = await handler({
+    type: "BEGIN_UNDO_OPERATION",
+    operation,
+    windowId,
+    data,
+  });
+  assert.equal(response.transaction.operation, operation);
   return response.transaction;
 }
 
@@ -493,4 +564,157 @@ test("does not reopen a partially failed restoration", async () => {
   assert.equal(result.outcome.status, "partial");
   assert.equal(result.transaction, null);
   assert.equal(browser.storedTransaction, null);
+});
+
+test("restores a sorted tab arrangement from its captured indices", async () => {
+  const browser = createFakeBrowser();
+  const handler = createBackgroundMessageHandler(browser);
+  const transaction = await beginOperation(handler, "sort-by-domain", {
+    tabs: [
+      { tabId: 1, windowId: 5, index: 0, pinned: false },
+      { tabId: 2, windowId: 5, index: 1, pinned: false },
+      { tabId: 3, windowId: 5, index: 2, pinned: false },
+    ],
+  });
+  const tabs = [
+    { id: 2, windowId: 5, index: 0, pinned: false },
+    { id: 3, windowId: 5, index: 1, pinned: false },
+    { id: 1, windowId: 5, index: 2, pinned: false },
+  ];
+  browser.getNormalWindowsImpl = async () => [{ id: 5, type: "normal", tabs }];
+  browser.moveTabsImpl = async ([tabId], index) => {
+    const moved = tabs.splice(tabs.findIndex((tab) => tab.id === tabId), 1)[0];
+    tabs.splice(Math.min(index, tabs.length), 0, moved);
+    tabs.forEach((tab, tabIndex) => {
+      tab.index = tabIndex;
+    });
+  };
+
+  const result = await handler({
+    type: "RESTORE_UNDO_TRANSACTION",
+    transactionId: transaction.id,
+  });
+
+  assert.equal(result.outcome.status, "restored");
+  assert.deepEqual(tabs.map((tab) => tab.id), [1, 2, 3]);
+  assert.deepEqual(
+    browser.calls.filter(([name]) => name === "moveTabs"),
+    [
+      ["moveTabs", [1], 0],
+      ["moveTabs", [2], 1],
+      ["moveTabs", [3], 2],
+    ],
+  );
+});
+
+test("reports a partial gather undo when a source window is gone", async () => {
+  const browser = createFakeBrowser();
+  const handler = createBackgroundMessageHandler(browser);
+  const transaction = await beginOperation(handler, "gather-tabs-here", {
+    tabs: [{ tabId: 9, sourceWindowId: 7, index: 2 }],
+  });
+  await handler({
+    type: "UPDATE_UNDO_OPERATION",
+    transactionId: transaction.id,
+    data: {
+      tabs: [
+        {
+          tabId: 9,
+          sourceWindowId: 7,
+          index: 2,
+          state: "moved",
+        },
+      ],
+    },
+  });
+  const tabs = [{ id: 9, windowId: 5, index: 0 }];
+  browser.getNormalWindowsImpl = async () => [
+    { id: 5, type: "normal", incognito: false, tabs },
+  ];
+  browser.moveTabsToWindowImpl = async () => {};
+  browser.moveTabsImpl = async () => {};
+
+  const result = await handler({
+    type: "RESTORE_UNDO_TRANSACTION",
+    transactionId: transaction.id,
+  });
+
+  assert.equal(result.outcome.status, "partial");
+  assert.equal(result.outcome.restored, 1);
+  assert.match(result.outcome.failures[0], /Source window 7 was closed/);
+  assert.equal(
+    browser.calls.some(([name]) => name === "createWindow"),
+    false,
+  );
+});
+
+test("ungroups the tabs created by a grouping operation", async () => {
+  const browser = createFakeBrowser();
+  const handler = createBackgroundMessageHandler(browser);
+  const transaction = await beginOperation(handler, "group-tabs", {
+    groups: [{ groupId: 12, tabIds: [1, 2] }],
+  });
+  browser.getNormalWindowsImpl = async () => [
+    {
+      id: 5,
+      type: "normal",
+      tabs: [
+        { id: 1, windowId: 5 },
+        { id: 2, windowId: 5 },
+      ],
+    },
+  ];
+
+  const result = await handler({
+    type: "RESTORE_UNDO_TRANSACTION",
+    transactionId: transaction.id,
+  });
+
+  assert.equal(result.outcome.status, "restored");
+  assert.deepEqual(
+    browser.calls.filter(([name]) => name === "ungroupTabs"),
+    [["ungroupTabs", [1, 2]]],
+  );
+});
+
+test("recreates dissolved groups with their captured appearance", async () => {
+  const browser = createFakeBrowser();
+  const handler = createBackgroundMessageHandler(browser);
+  const transaction = await beginOperation(handler, "ungroup-tabs", {
+    groups: [
+      {
+        groupId: 12,
+        title: "example.com",
+        color: "blue",
+        collapsed: true,
+        tabIds: [1, 2],
+      },
+    ],
+  });
+  browser.getNormalWindowsImpl = async () => [
+    {
+      id: 5,
+      type: "normal",
+      tabs: [
+        { id: 1, windowId: 5 },
+        { id: 2, windowId: 5 },
+      ],
+    },
+  ];
+  browser.groupTabsImpl = async () => 21;
+
+  const result = await handler({
+    type: "RESTORE_UNDO_TRANSACTION",
+    transactionId: transaction.id,
+  });
+
+  assert.equal(result.outcome.status, "restored");
+  assert.deepEqual(
+    browser.calls.filter(([name]) => name === "updateTabGroup"),
+    [["updateTabGroup", 21, {
+      title: "example.com",
+      color: "blue",
+      collapsed: true,
+    }]],
+  );
 });

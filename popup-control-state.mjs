@@ -53,16 +53,61 @@ export function getRecentControlState(state) {
 
 export function getUndoControlState(state) {
   const count = state.undoTransaction?.count || 0;
+  const operation = state.undoTransaction?.operation || "duplicate-cleanup";
 
   if (count === 0) {
     return { hidden: true, disabled: state.busy, text: null, ariaLabel: null };
   }
 
+  const copy = getUndoCopy(operation, state.undoTransaction);
+
   return {
     hidden: false,
     disabled: state.busy,
-    text: `Closed ${count} ${pluralize("tab", count)}`,
-    ariaLabel:
-      `Undo the latest duplicate cleanup and restore ${count} ${pluralize("tab", count)}`,
+    text: copy.text,
+    ariaLabel: copy.ariaLabel,
   };
+}
+
+function getUndoCopy(operation, summary) {
+  const count = summary.count;
+  const tabs = `${count} ${pluralize("tab", count)}`;
+
+  switch (operation) {
+    case "sort-by-domain":
+      return {
+        text: `Sorted ${tabs}`,
+        ariaLabel: `Undo sorting and restore the previous order of ${tabs}`,
+      };
+    case "group-tabs": {
+      const groupCount = summary.groupCount || 0;
+      return {
+        text: `Grouped ${tabs} into ${groupCount} ${pluralize("group", groupCount)}`,
+        ariaLabel:
+          `Undo grouping and ungroup ${tabs} from ${groupCount} ${pluralize("group", groupCount)}`,
+      };
+    }
+    case "ungroup-tabs": {
+      const groupCount = summary.groupCount || 0;
+      return {
+        text: `Ungrouped ${tabs} from ${groupCount} ${pluralize("group", groupCount)}`,
+        ariaLabel:
+          `Undo ungrouping and restore ${tabs} to ${groupCount} ${pluralize("group", groupCount)}`,
+      };
+    }
+    case "gather-tabs-here": {
+      const windowCount = summary.windowCount || 0;
+      return {
+        text: `Gathered ${tabs} from ${windowCount} ${pluralize("window", windowCount)}`,
+        ariaLabel:
+          `Undo gathering and return ${tabs} to ${windowCount} ${pluralize("window", windowCount)}`,
+      };
+    }
+    default:
+      return {
+        text: `Closed ${tabs}`,
+        ariaLabel:
+          `Undo the latest duplicate cleanup and restore ${tabs}`,
+      };
+  }
 }

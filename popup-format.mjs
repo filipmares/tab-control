@@ -114,7 +114,14 @@ export function formatGatherOutcome(gatheredTabCount, windowCount) {
   return `Gathered ${gatheredTabCount} ${pluralize("tab", gatheredTabCount)} from ${windowCount} other ${pluralize("window", windowCount)}.`;
 }
 
-export function formatRestorationOutcome(outcome) {
+export function formatRestorationOutcome(
+  outcome,
+  operation = "duplicate-cleanup",
+) {
+  if (operation !== "duplicate-cleanup") {
+    return formatOperationRestorationOutcome(outcome, operation);
+  }
+
   switch (outcome.status) {
     case "restored": {
       const detail = outcome.recreated > 0
@@ -147,4 +154,36 @@ export function formatRestorationOutcome(outcome) {
     default:
       return { message: "Undo is no longer available.", tone: "error" };
   }
+}
+
+function formatOperationRestorationOutcome(outcome, operation) {
+  const operationLabel = {
+    "sort-by-domain": "tab order",
+    "group-tabs": "domain groups",
+    "ungroup-tabs": "domain groups",
+    "gather-tabs-here": "tab locations",
+  }[operation] || "tab organization";
+  const failures = outcome.failures?.length
+    ? ` ${outcome.failures.join(" ")}`
+    : "";
+
+  if (outcome.status === "restored") {
+    return {
+      message: `Undid the latest ${operationLabel} change for ${outcome.restored} ${pluralize("tab", outcome.restored)}.`,
+      tone: "success",
+    };
+  }
+
+  if (outcome.status === "partial") {
+    return {
+      message:
+        `Undid the latest ${operationLabel} change for ${outcome.restored} of ${outcome.total} tabs. ${outcome.failed} could not be reversed.${failures}`,
+      tone: "error",
+    };
+  }
+
+  return {
+    message: `Could not undo the latest ${operationLabel} change.${failures}`,
+    tone: "error",
+  };
 }

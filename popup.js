@@ -619,6 +619,21 @@ async function sortTabsByDomain() {
       return;
     }
 
+    const currentWindow = await browser.getCurrentWindow();
+    const startedTransaction = await beginUndoOperation(
+      "sort-by-domain",
+      currentWindow.id,
+      {
+        tabs: tabs.map((tab) => ({
+          tabId: tab.id,
+          windowId: tab.windowId,
+          index: tab.index,
+          pinned: tab.pinned,
+        })),
+      },
+    );
+    updateUndoTransaction(startedTransaction.transaction);
+
     for (const move of getTabMovePlan(currentIds, sortedIds)) {
       await moveTabsWithRetry(move.tabIds, move.index);
     }
@@ -648,12 +663,35 @@ async function groupTabsByDomain() {
       return;
     }
 
+    const currentWindow = await browser.getCurrentWindow();
+    const undoGroups = groupingPlan.map((domain) => ({
+      tabIds: domain.tabIds,
+      groupId: null,
+    }));
+    const startedTransaction = await beginUndoOperation(
+      "group-tabs",
+      currentWindow.id,
+      { groups: undoGroups },
+    );
+    updateUndoTransaction(startedTransaction.transaction);
+
     let groupedTabCount = 0;
 
-    for (const domain of groupingPlan) {
+    for (const [groupIndex, domain] of groupingPlan.entries()) {
       const groupId = await runWithTabEditRetry(() =>
         browser.groupTabs(domain.tabIds),
       );
+
+      undoGroups[groupIndex] = {
+        ...undoGroups[groupIndex],
+        groupId,
+        state: "created",
+      };
+      const updatedTransaction = await updateUndoOperation(
+        startedTransaction.transaction.id,
+        { groups: undoGroups },
+      );
+      updateUndoTransaction(updatedTransaction.transaction);
 
       await browser.updateTabGroup(groupId, {
         title: formatGroupTitle(domain.label),
@@ -698,6 +736,26 @@ async function ungroupDomainGroups() {
       return;
     }
 
+    const currentWindow = await browser.getCurrentWindow();
+    const undoGroups = await Promise.all(
+      ungroupingPlan.map(async (group) => {
+        const metadata = await browser.getTabGroup(group.groupId);
+        return {
+          groupId: group.groupId,
+          title: metadata.title || "",
+          color: metadata.color || "grey",
+          collapsed: Boolean(metadata.collapsed),
+          tabIds: group.tabIds,
+        };
+      }),
+    );
+    const startedTransaction = await beginUndoOperation(
+      "ungroup-tabs",
+      currentWindow.id,
+      { groups: undoGroups },
+    );
+    updateUndoTransaction(startedTransaction.transaction);
+
     const tabIds = ungroupingPlan.flatMap((group) => group.tabIds);
     await runWithTabEditRetry(() => browser.ungroupTabs(tabIds));
     await refreshSummary();
@@ -732,12 +790,48 @@ async function gatherTabsHere() {
       return;
     }
 
+    const currentTabById = new Map(
+      windows.flatMap((window) =>
+        (window.tabs || []).map((tab) => [tab.id, tab]),
+      ),
+    );
+    const sourceWindowById = new Map(
+      windows.map((window) => [window.id, window]),
+    );
+    const undoTabs = gatherPlan.flatMap((source) =>
+      source.tabIds.map((tabId) => ({
+        tabId,
+        sourceWindowId: source.windowId,
+        index: currentTabById.get(tabId)?.index ?? -1,
+        incognito: Boolean(sourceWindowById.get(source.windowId)?.incognito),
+      })),
+    );
+    const startedTransaction = await beginUndoOperation(
+      "gather-tabs-here",
+      currentWindow.id,
+      { tabs: undoTabs },
+    );
+    updateUndoTransaction(startedTransaction.transaction);
+
     let gatheredTabCount = 0;
+
+    const movedTabIds = new Set();
 
     for (const source of gatherPlan) {
       await runWithTabEditRetry(() =>
         browser.moveTabsToWindow(source.tabIds, currentWindow.id),
       );
+      for (const tabId of source.tabIds) {
+        movedTabIds.add(tabId);
+      }
+      const updatedTabs = undoTabs.map((tab) =>
+        movedTabIds.has(tab.tabId) ? { ...tab, state: "moved" } : tab,
+      );
+      const updatedTransaction = await updateUndoOperation(
+        startedTransaction.transaction.id,
+        { tabs: updatedTabs },
+      );
+      updateUndoTransaction(updatedTransaction.transaction);
       gatheredTabCount += source.tabIds.length;
     }
 
@@ -845,9 +939,28 @@ async function closeTabsForCleanup(tabs) {
   return result;
 }
 
+async function beginUndoOperation(operation, windowId, data) {
+  const result = await browser.sendBackgroundMessage({
+    type: "BEGIN_UNDO_OPERATION",
+    operation,
+    windowId,
+    data,
+  });
+  updateUndoTransaction(result.transaction);
+  return result;
+}
+
+async function updateUndoOperation(transactionId, data) {
+  return browser.sendBackgroundMessage({
+    type: "UPDATE_UNDO_OPERATION",
+    transactionId,
+    data,
+  });
+}
+
 async function getUndoTransaction() {
   const result = await browser.sendBackgroundMessage({
-    type: "GET_DUPLICATE_CLEANUP_UNDO",
+    type: "GET_UNDO_TRANSACTION",
   });
   return result.transaction;
 }
@@ -858,24 +971,25 @@ async function undoDuplicateCleanup() {
   }
 
   const transactionId = state.undoTransaction.id;
+  const operation = state.undoTransaction.operation || "duplicate-cleanup";
 
   if (state.reviewing) {
     leaveReview();
   }
 
-  setBusy(true, "Restoring closed tabs…");
+  setBusy(true, "Undoing the latest tab organization…");
 
   try {
     const result = await browser.sendBackgroundMessage({
-      type: "RESTORE_DUPLICATE_CLEANUP",
+      type: "RESTORE_UNDO_TRANSACTION",
       transactionId,
     });
     updateUndoTransaction(result.transaction);
-    showRestorationOutcome(result.outcome);
+    showRestorationOutcome(result.outcome, operation);
     await refreshSummary();
   } catch (error) {
     setStatus(
-      `Could not restore closed tabs. ${getErrorMessage(error)}`,
+      `Could not undo the latest tab organization. ${getErrorMessage(error)}`,
       "error",
     );
   } finally {
@@ -883,8 +997,8 @@ async function undoDuplicateCleanup() {
   }
 }
 
-function showRestorationOutcome(outcome) {
-  const { message, tone } = formatRestorationOutcome(outcome);
+function showRestorationOutcome(outcome, operation) {
+  const { message, tone } = formatRestorationOutcome(outcome, operation);
   setStatus(message, tone);
 }
 

@@ -81,9 +81,15 @@ globalThis.chrome = {
     move() {
       return Promise.resolve();
     },
+    update() {
+      return Promise.resolve();
+    },
     create() {},
   },
   tabGroups: {
+    get(groupId) {
+      return Promise.resolve(groupTitles.get(groupId) || {});
+    },
     update(groupId, properties) {
       groupTitles.set(groupId, properties);
       return Promise.resolve();
@@ -104,7 +110,15 @@ let transaction = null;
 
 function handleBackgroundMessage(message) {
   switch (message.type) {
+    case "GET_UNDO_TRANSACTION":
     case "GET_DUPLICATE_CLEANUP_UNDO":
+      return { ok: true, transaction };
+    case "BEGIN_UNDO_OPERATION":
+      transaction = {
+        id: "operation-1",
+        count: 0,
+        operation: message.operation,
+      };
       return { ok: true, transaction };
     case "BEGIN_DUPLICATE_CLEANUP":
       transaction = { id: "cleanup-1", count: 0 };
