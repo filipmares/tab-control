@@ -13,7 +13,11 @@ const GROUP_COLORS = [
 const GROUP_TITLE_LIMIT = 24;
 
 export function pluralize(word, count) {
-  return count === 1 ? word : `${word}s`;
+  if (count === 1) {
+    return word;
+  }
+
+  return /(?:s|x|z|ch|sh)$/.test(word) ? `${word}es` : `${word}s`;
 }
 
 export function formatSummary(summary, partialGroupCount) {

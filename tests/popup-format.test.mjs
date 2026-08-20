@@ -23,7 +23,15 @@ test("pluralizes only when the count is not one", () => {
   assert.equal(pluralize("tab", 1), "tab");
   assert.equal(pluralize("tab", 0), "tabs");
   assert.equal(pluralize("tab", 2), "tabs");
-  assert.equal(pluralize("match", 3), "matchs");
+  assert.equal(pluralize("match", 1), "match");
+  assert.equal(pluralize("match", 3), "matches");
+  assert.equal(pluralize("bus", 2), "buses");
+  assert.equal(pluralize("box", 2), "boxes");
+  assert.equal(pluralize("brush", 2), "brushes");
+  assert.equal(pluralize("site", 2), "sites");
+  assert.equal(pluralize("duplicate", 2), "duplicates");
+  assert.equal(pluralize("group", 2), "groups");
+  assert.equal(pluralize("window", 2), "windows");
 });
 
 test("formats the status summary line", () => {
@@ -208,12 +216,10 @@ test("reports the similar-tab review outcome", () => {
   );
   assert.equal(
     formatReviewOutcome({ closedCount: 0, reviewedCount: 3 }).message,
-    "Kept all tabs from 3 possible matchs.",
+    "Kept all tabs from 3 possible matches.",
   );
 });
 
-// "matchs" is the existing wording produced by pluralize(); this refactor pins
-// it rather than changing what users see.
 test("reports how many matches a stopped review left alone", () => {
   assert.equal(
     formatReviewStopped(1),
@@ -221,7 +227,7 @@ test("reports how many matches a stopped review left alone", () => {
   );
   assert.equal(
     formatReviewStopped(2),
-    "Review stopped. 2 possible matchs left unchanged.",
+    "Review stopped. 2 possible matches left unchanged.",
   );
 });
 
