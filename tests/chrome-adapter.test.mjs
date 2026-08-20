@@ -35,6 +35,7 @@ function createFakeChrome(overrides = {}) {
       tabs: {
         ...tabEvents,
         query: record("tabs.query"),
+        remove: record("tabs.remove"),
         move: record("tabs.move"),
         group: record("tabs.group"),
         ungroup: record("tabs.ungroup"),
@@ -42,8 +43,16 @@ function createFakeChrome(overrides = {}) {
       },
       tabGroups: { update: record("tabGroups.update") },
       windows: {
+        get: record("windows.get"),
         getCurrent: record("windows.getCurrent"),
         getAll: record("windows.getAll"),
+      },
+      storage: {
+        session: {
+          get: record("storage.session.get"),
+          set: record("storage.session.set"),
+          remove: record("storage.session.remove"),
+        },
       },
       runtime: { sendMessage: record("runtime.sendMessage") },
       sessions: {
@@ -68,6 +77,33 @@ test("reads tabs and windows with the popup's query shapes", async () => {
     ["tabs.query", { currentWindow: true }],
     ["windows.getCurrent"],
     ["windows.getAll", { populate: true, windowTypes: ["normal"] }],
+  ]);
+});
+
+test("adapts the background storage, tab, and window operations", async () => {
+  const chrome = createFakeChrome();
+  chrome.api.storage.session.get = (key) => {
+    chrome.calls.push(["storage.session.get", key]);
+    return Promise.resolve({ [key]: "value" });
+  };
+  const adapter = createChromeAdapter(chrome.api);
+
+  assert.equal(await adapter.getSessionValue("key"), "value");
+  await adapter.setSessionValue("key", "value");
+  await adapter.removeSessionValue("key");
+  await adapter.removeTab(7);
+  await adapter.getWindow(3);
+  await adapter.getAllWindows({ windowTypes: ["normal"] });
+  await adapter.queryWindowTabs(3);
+
+  assert.deepEqual(chrome.calls, [
+    ["storage.session.get", "key"],
+    ["storage.session.set", { key: "value" }],
+    ["storage.session.remove", "key"],
+    ["tabs.remove", 7],
+    ["windows.get", 3],
+    ["windows.getAll", { windowTypes: ["normal"] }],
+    ["tabs.query", { windowId: 3 }],
   ]);
 });
 

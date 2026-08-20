@@ -1,233 +1,450 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-let messageHandler;
-let stored = {};
-let recentlyClosed = [];
-let removeTab;
-let restoreSession;
-let createTab;
+import {
+  createBackgroundMessageHandler,
+  createBackgroundMessageListener,
+} from "../background-logic.mjs";
 
-globalThis.chrome = {
-  runtime: {
-    onMessage: {
-      addListener(listener) {
-        messageHandler = listener;
-      },
-    },
-  },
-  sessions: {
-    async getRecentlyClosed() {
-      return recentlyClosed;
-    },
-    async restore(sessionId) {
-      return restoreSession(sessionId);
-    },
-  },
-  storage: {
-    session: {
-      async get(key) {
-        return { [key]: stored[key] };
-      },
-      async set(values) {
-        Object.assign(stored, values);
-      },
-      async remove(key) {
-        delete stored[key];
-      },
-    },
-  },
-  tabs: {
-    async remove(tabId) {
-      return removeTab(tabId);
-    },
-    async query() {
-      return [];
-    },
-    async create(options) {
-      return createTab(options);
-    },
-  },
-  windows: {
-    async get(windowId) {
-      return {
-        id: windowId,
-        type: "normal",
-        incognito: false,
-      };
-    },
-    async getAll() {
-      return [];
-    },
-  },
-};
+const STORAGE_KEY = "latestDuplicateCleanup";
 
-await import("../background.js");
-
-test.beforeEach(() => {
-  stored = {};
-  recentlyClosed = [];
-  removeTab = async () => {};
-  restoreSession = async () => {
+function createFakeBrowser() {
+  const calls = [];
+  let storedTransaction = null;
+  let nextId = 1;
+  let recentlyClosed = [];
+  let removeTabImpl = async () => {};
+  let restoreSessionImpl = async () => {
     throw new Error("Session restore was not expected.");
   };
-  createTab = async () => {
-    throw new Error("Tab creation was not expected.");
-  };
-});
+  let createTabImpl = async () => ({ id: 100 });
+  let getWindowImpl = async (windowId) => ({
+    id: windowId,
+    type: "normal",
+    incognito: false,
+  });
+  let getAllWindowsImpl = async () => [];
+  let queryWindowTabsImpl = async () => [];
+  let onSet;
 
-test("undo restores the Chrome session captured after closing a tab", async () => {
-  removeTab = async (tabId) => {
-    recentlyClosed = [
-      {
-        tab: {
-          id: tabId,
-          sessionId: "closed-session-12",
-          windowId: 5,
-          url: "https://example.com/deep/page",
-        },
-      },
-    ];
-  };
-  const restoredSessionIds = [];
-  restoreSession = async (sessionId) => {
-    restoredSessionIds.push(sessionId);
-    return {};
-  };
-
-  const transaction = await beginTransaction();
-  await closeTabs(transaction.id, [
-    {
-      id: 12,
-      windowId: 5,
-      index: 3,
-      url: "https://example.com/deep/page",
+  const browser = {
+    calls,
+    get storedTransaction() {
+      return storedTransaction;
     },
-  ]);
-
-  const savedTransaction = stored.latestDuplicateCleanup;
-  assert.equal(savedTransaction.tabs[0].sessionId, "closed-session-12");
-
-  const result = await sendMessage({
-    type: "RESTORE_DUPLICATE_CLEANUP",
-    transactionId: transaction.id,
-  });
-
-  assert.deepEqual(restoredSessionIds, ["closed-session-12"]);
-  assert.deepEqual(result.outcome, {
-    status: "restored",
-    total: 1,
-    restored: 1,
-    historyRestored: 1,
-    recreated: 0,
-    failed: 0,
-    error: null,
-  });
-  assert.equal(stored.latestDuplicateCleanup, undefined);
-});
-
-test("undo recreates the address when Chrome has no closed session", async () => {
-  const createdOptions = [];
-  createTab = async (options) => {
-    createdOptions.push(options);
-    return { id: 120 };
+    set storedTransaction(value) {
+      storedTransaction = value;
+    },
+    set recentlyClosed(value) {
+      recentlyClosed = value;
+    },
+    set removeTabImpl(value) {
+      removeTabImpl = value;
+    },
+    set restoreSessionImpl(value) {
+      restoreSessionImpl = value;
+    },
+    set createTabImpl(value) {
+      createTabImpl = value;
+    },
+    set getWindowImpl(value) {
+      getWindowImpl = value;
+    },
+    set getAllWindowsImpl(value) {
+      getAllWindowsImpl = value;
+    },
+    set queryWindowTabsImpl(value) {
+      queryWindowTabsImpl = value;
+    },
+    set onSet(value) {
+      onSet = value;
+    },
+    generateId() {
+      const id = `transaction-${nextId}`;
+      nextId += 1;
+      calls.push(["generateId"]);
+      return id;
+    },
+    async getSessionValue(key) {
+      calls.push(["getSessionValue", key]);
+      return key === STORAGE_KEY ? storedTransaction : undefined;
+    },
+    async setSessionValue(key, value) {
+      calls.push(["setSessionValue", key, value]);
+      if (key === STORAGE_KEY) {
+        storedTransaction = value;
+      }
+      onSet?.(key, value);
+    },
+    async removeSessionValue(key) {
+      calls.push(["removeSessionValue", key]);
+      if (key === STORAGE_KEY) {
+        storedTransaction = null;
+      }
+    },
+    async removeTab(tabId) {
+      calls.push(["removeTab", tabId]);
+      return removeTabImpl(tabId);
+    },
+    async getRecentlyClosed(maxResults) {
+      calls.push(["getRecentlyClosed", maxResults]);
+      return recentlyClosed;
+    },
+    async restoreSession(sessionId) {
+      calls.push(["restoreSession", sessionId]);
+      return restoreSessionImpl(sessionId);
+    },
+    async getWindow(windowId) {
+      calls.push(["getWindow", windowId]);
+      return getWindowImpl(windowId);
+    },
+    async getAllWindows(options) {
+      calls.push(["getAllWindows", options]);
+      return getAllWindowsImpl(options);
+    },
+    async queryWindowTabs(windowId) {
+      calls.push(["queryWindowTabs", windowId]);
+      return queryWindowTabsImpl(windowId);
+    },
+    async createTab(options) {
+      calls.push(["createTab", options]);
+      return createTabImpl(options);
+    },
   };
 
-  const transaction = await beginTransaction();
-  await closeTabs(transaction.id, [
-    {
-      id: 20,
-      windowId: 5,
-      index: 2,
-      url: "https://example.com/fallback",
-      pinned: true,
-    },
-  ]);
-  const result = await sendMessage({
-    type: "RESTORE_DUPLICATE_CLEANUP",
-    transactionId: transaction.id,
-  });
-
-  assert.deepEqual(createdOptions, [
-    {
-      windowId: 5,
-      index: 0,
-      url: "https://example.com/fallback",
-      pinned: true,
-      active: false,
-    },
-  ]);
-  assert.equal(result.outcome.historyRestored, 0);
-  assert.equal(result.outcome.recreated, 1);
-});
-
-test("undo falls back to the saved address when session restore expires", async () => {
-  removeTab = async (tabId) => {
-    recentlyClosed = [
-      {
-        tab: {
-          id: tabId,
-          sessionId: "expired-session",
-          windowId: 5,
-          url: "https://example.com/expired",
-        },
-      },
-    ];
-  };
-  restoreSession = async () => {
-    throw new Error("The session is unavailable.");
-  };
-  createTab = async () => ({ id: 130 });
-
-  const transaction = await beginTransaction();
-  await closeTabs(transaction.id, [
-    {
-      id: 30,
-      windowId: 5,
-      index: 0,
-      url: "https://example.com/expired",
-    },
-  ]);
-  const result = await sendMessage({
-    type: "RESTORE_DUPLICATE_CLEANUP",
-    transactionId: transaction.id,
-  });
-
-  assert.equal(result.outcome.status, "restored");
-  assert.equal(result.outcome.historyRestored, 0);
-  assert.equal(result.outcome.recreated, 1);
-});
-
-async function beginTransaction() {
-  const result = await sendMessage({
-    type: "BEGIN_DUPLICATE_CLEANUP",
-    windowId: 5,
-  });
-  return result.transaction;
+  return browser;
 }
 
-function closeTabs(transactionId, tabs) {
-  return sendMessage({
+function sendMessage(listener, message) {
+  return new Promise((resolve) => {
+    const keepsChannelOpen = listener(message, {}, resolve);
+    assert.equal(keepsChannelOpen, true);
+  });
+}
+
+async function beginTransaction(browser, listener, windowId = 5) {
+  const response = await sendMessage(listener, {
+    type: "BEGIN_DUPLICATE_CLEANUP",
+    windowId,
+  });
+  assert.equal(response.ok, true);
+  return response.transaction;
+}
+
+async function closeTabs(browser, listener, transactionId, tabs) {
+  return sendMessage(listener, {
     type: "CLOSE_CLEANUP_TABS",
     transactionId,
     tabs,
   });
 }
 
-function sendMessage(message) {
-  return new Promise((resolve, reject) => {
-    const keepsChannelOpen = messageHandler(
-      message,
-      {},
-      (response) => {
-        if (response.ok) {
-          resolve(response);
-        } else {
-          reject(new Error(response.error));
-        }
-      },
-    );
-
-    assert.equal(keepsChannelOpen, true);
+async function createClosedTransaction(browser, handler, snapshots) {
+  const transaction = await handler({
+    type: "BEGIN_DUPLICATE_CLEANUP",
+    windowId: snapshots[0].windowId,
   });
+  await handler({
+    type: "CLOSE_CLEANUP_TABS",
+    transactionId: transaction.transaction.id,
+    tabs: snapshots.map((snapshot) => ({
+      id: snapshot.originalTabId,
+      windowId: snapshot.windowId,
+      index: snapshot.index,
+      url: snapshot.url,
+      pinned: snapshot.pinned,
+      incognito: snapshot.incognito,
+    })),
+  });
+  return transaction.transaction.id;
 }
+
+function snapshot(id, index = 0, options = {}) {
+  return {
+    originalTabId: id,
+    windowId: 5,
+    index,
+    url: `https://example.test/${id}`,
+    pinned: false,
+    incognito: false,
+    ...options,
+  };
+}
+
+test("dispatches messages with success and error response envelopes", async () => {
+  const browser = createFakeBrowser();
+  const listener = createBackgroundMessageListener(browser);
+
+  const success = await beginTransaction(browser, listener);
+  assert.deepEqual(success, {
+    id: "transaction-1",
+    count: 0,
+    createdAt: success.createdAt,
+  });
+
+  const unknown = await sendMessage(listener, { type: "UNKNOWN" });
+  assert.deepEqual(unknown, {
+    ok: false,
+    error: "Unknown Tab Control message.",
+  });
+});
+
+test("closes and records every requested tab in order", async () => {
+  const browser = createFakeBrowser();
+  const listener = createBackgroundMessageListener(browser);
+  const transaction = await beginTransaction(browser, listener);
+  browser.recentlyClosed = [];
+
+  const response = await closeTabs(browser, listener, transaction.id, [
+    { id: 12, windowId: 5, index: 1, url: "https://example.test/12" },
+    { id: 13, windowId: 5, index: 2, url: "https://example.test/13" },
+  ]);
+
+  assert.equal(response.ok, true);
+  assert.equal(response.closedNow, 2);
+  assert.equal(response.failed, 0);
+  assert.deepEqual(
+    browser.storedTransaction.tabs.map((tab) => tab.originalTabId),
+    [12, 13],
+  );
+  assert.deepEqual(
+    browser.calls.filter(([name]) => name === "removeTab"),
+    [["removeTab", 12], ["removeTab", 13]],
+  );
+});
+
+test("discards a tab when closing it fails and continues", async () => {
+  const browser = createFakeBrowser();
+  const listener = createBackgroundMessageListener(browser);
+  const transaction = await beginTransaction(browser, listener);
+  browser.removeTabImpl = async (tabId) => {
+    if (tabId === 12) {
+      throw new Error("Tab already closed.");
+    }
+  };
+
+  const response = await closeTabs(browser, listener, transaction.id, [
+    { id: 12, windowId: 5, index: 1, url: "https://example.test/12" },
+    { id: 13, windowId: 5, index: 2, url: "https://example.test/13" },
+  ]);
+
+  assert.equal(response.closedNow, 1);
+  assert.equal(response.failed, 1);
+  assert.deepEqual(
+    browser.storedTransaction.tabs.map((tab) => tab.originalTabId),
+    [13],
+  );
+});
+
+test("stops closing tabs when the transaction is superseded mid-loop", async () => {
+  const browser = createFakeBrowser();
+  const listener = createBackgroundMessageListener(browser);
+  const transaction = await beginTransaction(browser, listener);
+  let saves = 0;
+  browser.onSet = () => {
+    saves += 1;
+    if (saves === 2) {
+      browser.storedTransaction = {
+        id: "newer-transaction",
+        windowId: 5,
+        state: "open",
+        tabs: [],
+      };
+    }
+  };
+
+  const response = await closeTabs(browser, listener, transaction.id, [
+    { id: 12, windowId: 5, index: 1, url: "https://example.test/12" },
+    { id: 13, windowId: 5, index: 2, url: "https://example.test/13" },
+  ]);
+
+  assert.deepEqual(response, {
+    ok: false,
+    error: "This cleanup transaction is no longer available.",
+  });
+  assert.deepEqual(
+    browser.calls.filter(([name]) => name === "removeTab"),
+    [["removeTab", 12]],
+  );
+});
+
+test("reuses a matching original normal window", async () => {
+  const browser = createFakeBrowser();
+  const handler = createBackgroundMessageHandler(browser);
+  const transactionId = await createClosedTransaction(browser, handler, [
+    snapshot(12),
+  ]);
+  browser.getWindowImpl = async () => ({
+    id: 5,
+    type: "normal",
+    incognito: false,
+  });
+  browser.queryWindowTabsImpl = async () => [{ id: 1 }];
+
+  const result = await handler({
+    type: "RESTORE_DUPLICATE_CLEANUP",
+    transactionId,
+  });
+
+  assert.equal(result.outcome.status, "restored");
+  assert.equal(
+    browser.calls.some(
+      ([name, options]) =>
+        name === "getAllWindows" && options?.windowTypes?.[0] === "normal",
+    ),
+    false,
+  );
+  assert.equal(browser.calls.at(-1)[0], "removeSessionValue");
+});
+
+test("falls back for incognito mismatch and non-normal windows", async () => {
+  for (const originalWindow of [
+    { id: 5, type: "normal", incognito: true },
+    { id: 5, type: "popup", incognito: false },
+  ]) {
+    const browser = createFakeBrowser();
+    const handler = createBackgroundMessageHandler(browser);
+    const transactionId = await createClosedTransaction(browser, handler, [
+      snapshot(12),
+    ]);
+    browser.getWindowImpl = async () => originalWindow;
+    browser.getAllWindowsImpl = async () => [
+      { id: 9, type: "normal", incognito: false },
+    ];
+    browser.queryWindowTabsImpl = async () => [];
+
+    const result = await handler({
+      type: "RESTORE_DUPLICATE_CLEANUP",
+      transactionId,
+    });
+
+    assert.equal(result.outcome.status, "restored");
+    assert.deepEqual(
+      browser.calls.filter(([name]) => name === "createTab")[0][1].windowId,
+      9,
+    );
+  }
+});
+
+test("swallows a missing original window and uses a compatible fallback", async () => {
+  const browser = createFakeBrowser();
+  const handler = createBackgroundMessageHandler(browser);
+  const transactionId = await createClosedTransaction(browser, handler, [
+    snapshot(12),
+  ]);
+  browser.getWindowImpl = async () => {
+    throw new Error("No window with id: 5.");
+  };
+  browser.getAllWindowsImpl = async () => [
+    { id: 9, type: "normal", incognito: false },
+  ];
+  browser.queryWindowTabsImpl = async () => [];
+
+  const result = await handler({
+    type: "RESTORE_DUPLICATE_CLEANUP",
+    transactionId,
+  });
+
+  assert.equal(result.outcome.status, "restored");
+  assert.equal(
+    browser.calls.some(([name]) => name === "getAllWindows"),
+    true,
+  );
+});
+
+test("reports no-compatible-window failures", async () => {
+  const browser = createFakeBrowser();
+  const handler = createBackgroundMessageHandler(browser);
+  const transactionId = await createClosedTransaction(browser, handler, [
+    snapshot(12),
+  ]);
+  browser.getWindowImpl = async () => ({
+    id: 5,
+    type: "popup",
+    incognito: false,
+  });
+  browser.getAllWindowsImpl = async () => [
+    { id: 9, type: "normal", incognito: true },
+  ];
+
+  const result = await handler({
+    type: "RESTORE_DUPLICATE_CLEANUP",
+    transactionId,
+  });
+
+  assert.equal(result.outcome.status, "failed");
+  assert.match(result.outcome.error, /No compatible browser window/);
+});
+
+test("clamps negative and out-of-range restore indices", async () => {
+  const browser = createFakeBrowser();
+  const handler = createBackgroundMessageHandler(browser);
+  const transactionId = await createClosedTransaction(browser, handler, [
+    snapshot(12, -1),
+    snapshot(13, 99),
+  ]);
+  browser.queryWindowTabsImpl = async () => [{ id: 1 }, { id: 2 }];
+
+  const result = await handler({
+    type: "RESTORE_DUPLICATE_CLEANUP",
+    transactionId,
+  });
+
+  assert.equal(result.outcome.status, "restored");
+  assert.deepEqual(
+    browser.calls
+      .filter(([name]) => name === "createTab")
+      .map(([, options]) => options.index),
+    [2, 2],
+  );
+});
+
+test("reopens a fully failed restoration for retry", async () => {
+  const browser = createFakeBrowser();
+  const handler = createBackgroundMessageHandler(browser);
+  const transactionId = await createClosedTransaction(browser, handler, [
+    snapshot(12),
+  ]);
+  browser.getWindowImpl = async () => ({
+    id: 5,
+    type: "popup",
+    incognito: false,
+  });
+  browser.getAllWindowsImpl = async () => [];
+
+  const result = await handler({
+    type: "RESTORE_DUPLICATE_CLEANUP",
+    transactionId,
+  });
+
+  assert.equal(result.outcome.status, "failed");
+  assert.equal(result.transaction.count, 1);
+  assert.equal(browser.storedTransaction.state, "open");
+});
+
+test("does not reopen a partially failed restoration", async () => {
+  const browser = createFakeBrowser();
+  const handler = createBackgroundMessageHandler(browser);
+  const transactionId = await createClosedTransaction(browser, handler, [
+    snapshot(12),
+    snapshot(13),
+  ]);
+  let creates = 0;
+  browser.createTabImpl = async () => {
+    creates += 1;
+    if (creates === 2) {
+      throw new Error("Cannot create tab.");
+    }
+    return { id: 120 };
+  };
+  browser.queryWindowTabsImpl = async () => [];
+
+  const result = await handler({
+    type: "RESTORE_DUPLICATE_CLEANUP",
+    transactionId,
+  });
+
+  assert.equal(result.outcome.status, "partial");
+  assert.equal(result.transaction, null);
+  assert.equal(browser.storedTransaction, null);
+});

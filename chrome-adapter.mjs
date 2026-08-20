@@ -10,6 +10,30 @@ export const LIVE_SUMMARY_TAB_EVENTS = [
 
 export function createChromeAdapter(api) {
   return {
+    generateId() {
+      return crypto.randomUUID();
+    },
+    getSessionValue(key) {
+      return api.storage.session.get(key).then((values) => values[key]);
+    },
+    setSessionValue(key, value) {
+      return api.storage.session.set({ [key]: value });
+    },
+    removeSessionValue(key) {
+      return api.storage.session.remove(key);
+    },
+    removeTab(tabId) {
+      return api.tabs.remove(tabId);
+    },
+    getWindow(windowId) {
+      return api.windows.get(windowId);
+    },
+    getAllWindows(options) {
+      return api.windows.getAll(options);
+    },
+    queryWindowTabs(windowId) {
+      return api.tabs.query({ windowId });
+    },
     queryCurrentWindowTabs() {
       return api.tabs.query({ currentWindow: true });
     },
@@ -45,8 +69,10 @@ export function createChromeAdapter(api) {
     ungroupTabs(tabIds) {
       return api.tabs.ungroup(tabIds);
     },
-    createTab(url) {
-      return api.tabs.create({ url });
+    createTab(options) {
+      return api.tabs.create(
+        typeof options === "string" ? { url: options } : options,
+      );
     },
     async sendBackgroundMessage(message) {
       const response = await api.runtime.sendMessage(message);

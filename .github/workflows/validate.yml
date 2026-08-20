@@ -26,6 +26,7 @@ jobs:
       - name: Check JavaScript syntax
         run: |
           node --input-type=module --check < background.js
+          node --check background-logic.mjs
           node --check chrome-adapter.mjs
           node --check popup-control-state.mjs
           node --check popup-format.mjs
@@ -89,6 +90,7 @@ jobs:
           for required_file in \
             manifest.json \
             background.js \
+            background-logic.mjs \
             popup.js \
             chrome-adapter.mjs \
             popup-control-state.mjs \
