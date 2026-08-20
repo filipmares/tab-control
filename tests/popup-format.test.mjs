@@ -27,7 +27,7 @@ test("pluralizes only when the count is not one", () => {
   assert.equal(pluralize("match", 3), "matches");
   assert.equal(pluralize("bus", 2), "buses");
   assert.equal(pluralize("box", 2), "boxes");
-  assert.equal(pluralize("quiz", 2), "quizes");
+  assert.equal(pluralize("waltz", 2), "waltzes");
   assert.equal(pluralize("brush", 2), "brushes");
   assert.equal(pluralize("site", 2), "sites");
   assert.equal(pluralize("duplicate", 2), "duplicates");
