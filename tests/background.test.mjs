@@ -171,6 +171,30 @@ function snapshot(id, index = 0, options = {}) {
   };
 }
 
+function summarizeCleanupCalls(browser, startAt = 0) {
+  return browser.calls
+    .slice(startAt)
+    .filter(([name]) =>
+      ["getRecentlyClosed", "removeTab", "setSessionValue"].includes(name),
+    )
+    .map(([name, value, transaction]) => {
+      if (name === "removeTab") {
+        return [name, value];
+      }
+
+      if (name === "setSessionValue") {
+        return [
+          name,
+          transaction.tabs.map(
+            (tab) => `${tab.originalTabId}:${tab.state}`,
+          ),
+        ];
+      }
+
+      return [name];
+    });
+}
+
 test("dispatches messages with success and error response envelopes", async () => {
   const browser = createFakeBrowser();
   const listener = createBackgroundMessageListener(browser);
@@ -194,6 +218,7 @@ test("closes and records every requested tab in order", async () => {
   const listener = createBackgroundMessageListener(browser);
   const transaction = await beginTransaction(browser, listener);
   browser.recentlyClosed = [];
+  const cleanupStart = browser.calls.length;
 
   const response = await closeTabs(browser, listener, transaction.id, [
     { id: 12, windowId: 5, index: 1, url: "https://example.test/12" },
@@ -208,8 +233,18 @@ test("closes and records every requested tab in order", async () => {
     [12, 13],
   );
   assert.deepEqual(
-    browser.calls.filter(([name]) => name === "removeTab"),
-    [["removeTab", 12], ["removeTab", 13]],
+    summarizeCleanupCalls(browser, cleanupStart),
+    [
+      ["setSessionValue", ["12:pending", "13:pending"]],
+      ["getRecentlyClosed"],
+      ["removeTab", 12],
+      ["getRecentlyClosed"],
+      ["setSessionValue", ["12:closed", "13:pending"]],
+      ["getRecentlyClosed"],
+      ["removeTab", 13],
+      ["getRecentlyClosed"],
+      ["setSessionValue", ["12:closed", "13:closed"]],
+    ],
   );
 });
 
@@ -217,6 +252,7 @@ test("discards a tab when closing it fails and continues", async () => {
   const browser = createFakeBrowser();
   const listener = createBackgroundMessageListener(browser);
   const transaction = await beginTransaction(browser, listener);
+  const cleanupStart = browser.calls.length;
   browser.removeTabImpl = async (tabId) => {
     if (tabId === 12) {
       throw new Error("Tab already closed.");
@@ -233,6 +269,19 @@ test("discards a tab when closing it fails and continues", async () => {
   assert.deepEqual(
     browser.storedTransaction.tabs.map((tab) => tab.originalTabId),
     [13],
+  );
+  assert.deepEqual(
+    summarizeCleanupCalls(browser, cleanupStart),
+    [
+      ["setSessionValue", ["12:pending", "13:pending"]],
+      ["getRecentlyClosed"],
+      ["removeTab", 12],
+      ["setSessionValue", ["13:pending"]],
+      ["getRecentlyClosed"],
+      ["removeTab", 13],
+      ["getRecentlyClosed"],
+      ["setSessionValue", ["13:closed"]],
+    ],
   );
 });
 
