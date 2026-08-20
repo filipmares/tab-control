@@ -157,33 +157,79 @@ export function formatRestorationOutcome(
 }
 
 function formatOperationRestorationOutcome(outcome, operation) {
-  const operationLabel = {
-    "sort-by-domain": "tab order",
-    "group-tabs": "domain groups",
-    "ungroup-tabs": "domain groups",
-    "gather-tabs-here": "tab locations",
-  }[operation] || "tab organization";
   const failures = outcome.failures?.length
     ? ` ${outcome.failures.join(" ")}`
     : "";
 
+  if (outcome.status === "expired") {
+    return { message: "Undo is no longer available.", tone: "error" };
+  }
+
   if (outcome.status === "restored") {
     return {
-      message: `Undid the latest ${operationLabel} change for ${outcome.restored} ${pluralize("tab", outcome.restored)}.`,
+      message: getOperationRestoredMessage(outcome, operation),
       tone: "success",
     };
   }
 
   if (outcome.status === "partial") {
     return {
-      message:
-        `Undid the latest ${operationLabel} change for ${outcome.restored} of ${outcome.total} tabs. ${outcome.failed} could not be reversed.${failures}`,
+      message: `${getOperationPartialMessage(outcome, operation)} ${outcome.failed} could not be reversed.${failures}`,
       tone: "error",
     };
   }
 
   return {
-    message: `Could not undo the latest ${operationLabel} change.${failures}`,
+    message: `Could not undo ${getOperationObject(operation)}.${failures}`,
     tone: "error",
   };
+}
+
+function getOperationRestoredMessage(outcome, operation) {
+  const tabs = `${outcome.restored} ${pluralize("tab", outcome.restored)}`;
+
+  switch (operation) {
+    case "sort-by-domain":
+      return `Restored the previous order of ${tabs}.`;
+    case "group-tabs":
+      return `Ungrouped ${tabs}.`;
+    case "ungroup-tabs":
+      return `Regrouped ${tabs} into ${outcome.groupCount} domain ${pluralize("group", outcome.groupCount)}.`;
+    case "gather-tabs-here":
+      return `Returned ${tabs} to ${outcome.windowCount} ${pluralize("window", outcome.windowCount)}.`;
+    default:
+      return `Undid the latest tab organization change for ${tabs}.`;
+  }
+}
+
+function getOperationPartialMessage(outcome, operation) {
+  const tabs = `${outcome.restored} of ${outcome.total} tabs`;
+
+  switch (operation) {
+    case "sort-by-domain":
+      return `Restored the previous order of ${tabs}.`;
+    case "group-tabs":
+      return `Ungrouped ${tabs}.`;
+    case "ungroup-tabs":
+      return `Regrouped ${tabs} into ${outcome.groupCount} domain ${pluralize("group", outcome.groupCount)}.`;
+    case "gather-tabs-here":
+      return `Returned ${tabs} to ${outcome.windowCount} ${pluralize("window", outcome.windowCount)}.`;
+    default:
+      return `Undid the latest tab organization change for ${tabs}.`;
+  }
+}
+
+function getOperationObject(operation) {
+  switch (operation) {
+    case "sort-by-domain":
+      return "the previous tab order";
+    case "group-tabs":
+      return "grouping these tabs";
+    case "ungroup-tabs":
+      return "regrouping these tabs";
+    case "gather-tabs-here":
+      return "returning these tabs to their source windows";
+    default:
+      return "the latest tab organization change";
+  }
 }
