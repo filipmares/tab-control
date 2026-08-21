@@ -55,7 +55,7 @@ const screenshots = [
     title: "Duplicates closed. Near-matches reviewed.",
     lede:
       "Exact copies close automatically. Addresses that only look alike are shown side by side with the difference highlighted, so you decide what stays.",
-    footer: "Undo restores the whole cleanup as one transaction.",
+    footer: "Undo puts the whole cleanup back in one press.",
   },
   {
     name: "03-organize",
@@ -64,7 +64,8 @@ const screenshots = [
     title: "One press files the whole window.",
     lede:
       "Sort orders every tab by domain, then by page title. Group builds named Chrome tab groups for sites with two or more tabs — and turns into Ungroup when you are done.",
-    footer: "Pinned tabs keep their place. Nothing is closed.",
+    footer:
+      "Pinned tabs keep their place. Nothing is closed. Undo reverses either action.",
   },
   {
     name: "04-gather",
@@ -73,7 +74,8 @@ const screenshots = [
     title: "Pull scattered tabs into one window.",
     lede:
       "Loose tabs from your other Chrome windows are appended to the window you are in, so a scattered session becomes a single working window.",
-    footer: "Pinned and grouped tabs stay where you put them.",
+    footer:
+      "Pinned and grouped tabs stay where you put them. Undo sends gathered tabs home.",
   },
   {
     name: "05-recently-closed",
