@@ -269,25 +269,38 @@ function startServer() {
   });
 }
 
-function findBrowser() {
+export function browserCandidates(
+  env = process.env,
+  platform = process.platform,
+) {
+  const platformPath = platform === "win32" ? path.win32 : path;
   const windowsRoots = [
-    process.env.ProgramFiles,
-    process.env["ProgramFiles(x86)"],
-    process.env.LOCALAPPDATA,
+    env.ProgramFiles,
+    env["ProgramFiles(x86)"],
+    env.LOCALAPPDATA,
   ].filter(Boolean);
   const windowsBrowsers = windowsRoots.flatMap((root) => [
-    path.join(root, "Google/Chrome/Application/chrome.exe"),
-    path.join(root, "Microsoft/Edge/Application/msedge.exe"),
-    path.join(root, "BraveSoftware/Brave-Browser/Application/brave.exe"),
-    path.join(root, "Chromium/Application/chrome.exe"),
-    path.join(root, "Chromium/Application/chromium.exe"),
+    platformPath.join(root, "Google/Chrome/Application/chrome.exe"),
+    platformPath.join(root, "Microsoft/Edge/Application/msedge.exe"),
+    platformPath.join(root, "BraveSoftware/Brave-Browser/Application/brave.exe"),
+    platformPath.join(root, "Chromium/Application/chrome.exe"),
+    platformPath.join(root, "Chromium/Application/chromium.exe"),
   ]);
   const browsers = [
-    process.env.CHROME_PATH,
-    ...(process.platform === "win32" ? windowsBrowsers : MACOS_BROWSERS),
+    env.CHROME_PATH,
+    ...(platform === "win32" ? windowsBrowsers : MACOS_BROWSERS),
   ].filter(Boolean);
-  const searched = [...new Set(browsers)];
-  const browser = searched.find((candidate) => existsSync(candidate));
+
+  return [...new Set(browsers)];
+}
+
+export function findBrowser({
+  env = process.env,
+  platform = process.platform,
+  exists = existsSync,
+} = {}) {
+  const searched = browserCandidates(env, platform);
+  const browser = searched.find((candidate) => exists(candidate));
 
   if (!browser) {
     throw new Error(
@@ -647,7 +660,12 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
