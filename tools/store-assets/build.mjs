@@ -273,17 +273,18 @@ export function browserCandidates(
   env = process.env,
   platform = process.platform,
 ) {
+  const platformPath = platform === "win32" ? path.win32 : path;
   const windowsRoots = [
     env.ProgramFiles,
     env["ProgramFiles(x86)"],
     env.LOCALAPPDATA,
   ].filter(Boolean);
   const windowsBrowsers = windowsRoots.flatMap((root) => [
-    path.join(root, "Google/Chrome/Application/chrome.exe"),
-    path.join(root, "Microsoft/Edge/Application/msedge.exe"),
-    path.join(root, "BraveSoftware/Brave-Browser/Application/brave.exe"),
-    path.join(root, "Chromium/Application/chrome.exe"),
-    path.join(root, "Chromium/Application/chromium.exe"),
+    platformPath.join(root, "Google/Chrome/Application/chrome.exe"),
+    platformPath.join(root, "Microsoft/Edge/Application/msedge.exe"),
+    platformPath.join(root, "BraveSoftware/Brave-Browser/Application/brave.exe"),
+    platformPath.join(root, "Chromium/Application/chrome.exe"),
+    platformPath.join(root, "Chromium/Application/chromium.exe"),
   ]);
   const browsers = [
     env.CHROME_PATH,
