@@ -2,7 +2,6 @@
 name: chrome-web-store-release
 description: Prepare a Tab Control release for Chrome Web Store submission by validating the release package, regenerating and classifying store assets, and producing a precise manual dashboard handoff. Use when preparing, packaging, or publishing a Tab Control release to the Chrome Web Store.
 user-invocable: true
-user-invocable: true
 ---
 
 # Chrome Web Store release preparation
