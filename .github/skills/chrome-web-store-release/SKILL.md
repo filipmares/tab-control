@@ -65,17 +65,23 @@ and stop before dashboard mutation.
 
 ### 1. Establish the release
 
-Read `manifest.json`, `version.txt`, and `.release-please-manifest.json` and
-confirm they agree. For a published release, inspect the matching GitHub
-Release and locate `tab-control-<version>.zip`. Record its URL, size, and
-checksum when available.
+Resolve the requested release tag or commit before reading repository files.
+Read `manifest.json`, `version.txt`, and `.release-please-manifest.json` from
+that exact tree (for example, with `git show <release-ref>:<path>`), not from
+the invoking checkout. Confirm the three sources agree. For a published
+release, inspect the matching GitHub Release and locate
+`tab-control-<version>.zip`. Record its URL, size, and checksum when available.
 
 If the requested version is not tagged or the package is missing, stop with a
 blocked handoff. Do not create a replacement package as a workaround.
 
 ### 2. Validate the repository
 
-Run the smallest existing checks that cover the release:
+Run the smallest existing checks that cover the resolved release tree. Use a
+clean worktree at the resolved tag or commit when local commands execute
+against source files. If a clean checkout is impractical, cite the resolved
+release commit's successful CI evidence instead of validating the current
+checkout as if it were the release.
 
 ```text
 node --test tests/*.test.mjs
@@ -112,8 +118,11 @@ The same command also refreshes `icons/icon-*.png` and the README screenshots
 under `docs/`. Those are not Chrome Web Store listing uploads.
 
 Use `CHROME_PATH` when browser discovery needs an explicit executable. If no
-supported browser is available, report the exact command and environment
-needed to rerun the generation; do not silently skip it.
+supported browser is available, ask whether to continue with the existing
+listing imagery. When imagery is optional and the user chooses to continue,
+classify the assets as unavailable/not applicable and proceed with package
+preparation. If imagery regeneration is a release requirement, report the
+exact command and environment needed to rerun it and block the handoff.
 
 ### 4. Classify asset changes
 
@@ -178,7 +187,7 @@ Stop and report a blocked or deferred handoff when:
 - version sources disagree;
 - the requested release or CI ZIP cannot be found;
 - required local validation fails;
-- asset generation needs an unavailable browser;
+- asset generation is required but needs an unavailable browser;
 - the user has not approved a material release or upload decision;
 - an authenticated publishing action would be required but no approved
   mechanism is available.
