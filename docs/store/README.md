@@ -48,8 +48,9 @@ install roots for each browser. Set `CHROME_PATH` to use a specific browser
 executable or an installation in another location; it is checked first.
 Resizing and JPEG conversion run in the browser with a canvas, so no image
 tools or package installation is required. Intermediate pages and PNGs are
-written to the ignored `dist/store-assets/` directory; finished assets land in
-`docs/store/`.
+written to the ignored `dist/store-assets/` directory; store-listing assets land
+in `docs/store/`, and the same run refreshes `icons/` and the README screenshots
+in `docs/` described below.
 
 Update the copy blocks in `tools/store-assets/build.mjs` and the fixture windows
 in `tools/store-assets/scenarios.mjs` when the popup gains or loses a feature, so
