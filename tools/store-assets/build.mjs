@@ -15,7 +15,7 @@ const root = path.resolve(here, "../..");
 const stageDir = path.join(root, "dist/store-assets");
 const outputDir = path.join(root, "docs/store");
 
-const BROWSERS = [
+const MACOS_BROWSERS = [
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   "/Applications/Chromium.app/Contents/MacOS/Chromium",
   "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
@@ -270,11 +270,28 @@ function startServer() {
 }
 
 function findBrowser() {
-  const browser = BROWSERS.find((candidate) => existsSync(candidate));
+  const windowsRoots = [
+    process.env.ProgramFiles,
+    process.env["ProgramFiles(x86)"],
+    process.env.LOCALAPPDATA,
+  ].filter(Boolean);
+  const windowsBrowsers = windowsRoots.flatMap((root) => [
+    path.join(root, "Google/Chrome/Application/chrome.exe"),
+    path.join(root, "Microsoft/Edge/Application/msedge.exe"),
+    path.join(root, "BraveSoftware/Brave-Browser/Application/brave.exe"),
+    path.join(root, "Chromium/Application/chrome.exe"),
+    path.join(root, "Chromium/Application/chromium.exe"),
+  ]);
+  const browsers = [
+    process.env.CHROME_PATH,
+    ...(process.platform === "win32" ? windowsBrowsers : MACOS_BROWSERS),
+  ].filter(Boolean);
+  const searched = [...new Set(browsers)];
+  const browser = searched.find((candidate) => existsSync(candidate));
 
   if (!browser) {
     throw new Error(
-      `No Chromium-based browser found. Looked for:\n${BROWSERS.join("\n")}`,
+      `No Chromium-based browser found. Looked for:\n${searched.join("\n")}`,
     );
   }
 
@@ -310,16 +327,6 @@ async function waitForStableFile(target, timeoutMs) {
   return false;
 }
 
-function run(command, args) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: "ignore" });
-    child.on("error", reject);
-    child.on("exit", (code) =>
-      code === 0 ? resolve() : reject(new Error(`${command} exited with ${code}`)),
-    );
-  });
-}
-
 async function capture(browser, url, target, width, height, options = {}) {
   const profile = path.join(stageDir, `profile-${path.basename(target, ".png")}`);
   await rm(target, { force: true });
@@ -342,32 +349,6 @@ async function capture(browser, url, target, width, height, options = {}) {
   if (!captured) {
     throw new Error(`Timed out capturing ${url}`);
   }
-}
-
-async function resize(source, target, width, height) {
-  await run("sips", [
-    "-z",
-    String(height),
-    String(width),
-    source,
-    "--out",
-    target,
-  ]);
-}
-
-async function toStoreImage(pngPath, jpgPath, width, height) {
-  await resize(pngPath, jpgPath, width, height);
-  await run("sips", [
-    "-s",
-    "format",
-    "jpeg",
-    "-s",
-    "formatOptions",
-    "95",
-    jpgPath,
-    "--out",
-    jpgPath,
-  ]);
 }
 
 const ICON_SIZES = [16, 32, 48, 128];
@@ -413,6 +394,67 @@ ${svg}
 // the raster sizes can never drift from the vector source. Chrome's store icon
 // guidance asks for a 96x96 mark inside the 128x128 canvas; toolbar icons stay
 // full-bleed because Chrome adds its own padding there.
+async function encodeImage(server, browser, source, target, width, height, format) {
+  const port = server.address().port;
+  const name = `encode-${path.basename(target)}`;
+  const mime = format === "jpeg" ? "image/jpeg" : "image/png";
+  const quality = format === "jpeg" ? ", 0.95" : "";
+  const html = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Encode image</title>
+  </head>
+  <body>
+    <script>
+      const image = new Image();
+      image.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = ${width};
+        canvas.height = ${height};
+        canvas.getContext("2d").drawImage(image, 0, 0, ${width}, ${height});
+        document.body.dataset.image = canvas.toDataURL("${mime}"${quality}).split(",", 2)[1];
+      };
+      image.src = "/dist/store-assets/${path.basename(source)}";
+    </script>
+  </body>
+</html>`;
+
+  await writeFile(path.join(stageDir, `${name}.html`), html);
+  const output = await dumpDom(
+    browser,
+    `http://127.0.0.1:${port}/dist/store-assets/${name}.html`,
+    path.join(stageDir, `profile-${name}`),
+  );
+  const match = output.match(/data-image="([^"]+)"/);
+
+  if (!match) {
+    throw new Error(`Image encoding did not return data for ${source}.`);
+  }
+
+  const base64 = match[1];
+
+  if (!base64 || base64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) {
+    throw new Error(`Image encoding returned an invalid base64 payload for ${source}.`);
+  }
+
+  const encoded = Buffer.from(base64, "base64");
+
+  if (encoded.length === 0) {
+    throw new Error(`Image encoding returned an empty payload for ${source}.`);
+  }
+
+  await writeFile(target, encoded);
+}
+
+async function resize(server, browser, source, target, width, height) {
+  await encodeImage(server, browser, source, target, width, height, "png");
+}
+
+async function toStoreImage(server, browser, pngPath, jpgPath, width, height) {
+  await encodeImage(server, browser, pngPath, jpgPath, width, height, "jpeg");
+}
+
 async function buildIcons(server, browser) {
   const port = server.address().port;
   const master = path.join(stageDir, "icon-master.png");
@@ -443,12 +485,12 @@ async function buildIcons(server, browser) {
 
   for (const size of ICON_SIZES) {
     const target = path.join(root, `icons/icon-${size}.png`);
-    await resize(master, target, size, size);
+    await resize(server, browser, master, target, size, size);
     console.log(`${size}x${size} ${path.relative(root, target)}`);
   }
 
   const storeIcon = path.join(outputDir, "store-icon-128.png");
-  await resize(storeMaster, storeIcon, 128, 128);
+  await resize(server, browser, storeMaster, storeIcon, 128, 128);
   console.log(`128x128 ${path.relative(root, storeIcon)}`);
 }
 
@@ -476,7 +518,7 @@ function browserArgs(profile, extra) {
   ];
 }
 
-async function measurePopupHeight(browser, url, profile) {
+async function dumpDom(browser, url, profile) {
   const child = spawn(
     browser,
     browserArgs(profile, ["--window-size=360,2000", "--dump-dom", url]),
@@ -485,26 +527,52 @@ async function measurePopupHeight(browser, url, profile) {
 
   let output = "";
 
-  const height = await new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
+    let settled = false;
     const timer = setTimeout(() => {
-      child.kill("SIGKILL");
-      reject(new Error(`Timed out measuring ${url}`));
+      if (!settled) {
+        settled = true;
+        child.kill("SIGKILL");
+        reject(new Error(`Timed out reading ${url}`));
+      }
     }, 60_000);
 
     child.stdout.on("data", (chunk) => {
       output += chunk;
-      const match = output.match(/data-popup-height="(\d+)"/);
-
-      if (match) {
+    });
+    child.on("error", (error) => {
+      if (!settled) {
+        settled = true;
         clearTimeout(timer);
-        child.kill("SIGKILL");
-        resolve(Number(match[1]));
+        reject(error);
       }
     });
-    child.on("error", reject);
-  });
+    child.on("close", (code) => {
+      if (settled) {
+        return;
+      }
 
-  return height;
+      settled = true;
+      clearTimeout(timer);
+
+      if (code === 0) {
+        resolve(output);
+      } else {
+        reject(new Error(`${browser} exited with ${code} while reading ${url}`));
+      }
+    });
+  });
+}
+
+async function measurePopupHeight(browser, url, profile) {
+  const output = await dumpDom(browser, url, profile);
+  const match = output.match(/data-popup-height="(\d+)"/);
+
+  if (!match) {
+    throw new Error(`Popup height was not returned for ${url}.`);
+  }
+
+  return Number(match[1]);
 }
 
 async function buildDocsShots(server, browser) {
@@ -571,7 +639,7 @@ async function main() {
         target.width,
         target.height,
       );
-      await toStoreImage(png, jpg, target.width, target.height);
+      await toStoreImage(server, browser, png, jpg, target.width, target.height);
       console.log(`${target.width}x${target.height}  ${path.relative(root, jpg)}`);
     }
   } finally {
