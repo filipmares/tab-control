@@ -41,10 +41,16 @@ height, so the documentation cannot fall behind the shipping UI.
 node tools/store-assets/build.mjs
 ```
 
-The script needs a Chromium-based browser installed at one of the paths listed in
-`BROWSERS` (Chrome, Chromium, Edge, or Brave) and macOS `sips` for resizing and
-JPEG conversion. Intermediate pages and PNGs are written to the ignored
-`dist/store-assets/` directory; only the finished JPEGs land here.
+The script needs a Chromium-based browser (Chrome, Chromium, Edge, or Brave).
+On macOS it checks the standard `/Applications/...` browser locations. On
+Windows it checks the `%ProgramFiles%`, `%ProgramFiles(x86)%`, and `%LOCALAPPDATA%`
+install roots for each browser. Set `CHROME_PATH` to use a specific browser
+executable or an installation in another location; it is checked first.
+Resizing and JPEG conversion run in the browser with a canvas, so no image
+tools or package installation is required. Intermediate pages and PNGs are
+written to the ignored `dist/store-assets/` directory; store-listing assets land
+in `docs/store/`, and the same run refreshes `icons/` and the README screenshots
+in `docs/` described below.
 
 Update the copy blocks in `tools/store-assets/build.mjs` and the fixture windows
 in `tools/store-assets/scenarios.mjs` when the popup gains or loses a feature, so
