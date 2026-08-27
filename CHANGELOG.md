@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.2.0](https://github.com/filipmares/tab-control/compare/v3.1.0...v3.2.0) (2026-08-27)
+
+
+### Features
+
+* add Chrome i18n support ([#65](https://github.com/filipmares/tab-control/issues/65)) ([715f29a](https://github.com/filipmares/tab-control/commit/715f29abb6b7ed89fcdc83be13896ab2c387841c))
+
 ## [3.1.0](https://github.com/filipmares/tab-control/compare/v3.0.6...v3.1.0) (2026-08-20)
 
 
