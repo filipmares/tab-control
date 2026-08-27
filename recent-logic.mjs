@@ -1,4 +1,4 @@
-import { pluralize } from "./popup-format.mjs";
+import { createMessage, createPluralMessage } from "./i18n.mjs";
 
 export const RECENT_SESSION_LIMIT = 10;
 
@@ -28,7 +28,7 @@ export function createRecentlyClosedViewModel(
 
 export function formatRecentDomain(urlValue) {
   if (!urlValue) {
-    return "Address unavailable";
+    return createMessage("addressUnavailable");
   }
 
   try {
@@ -36,34 +36,34 @@ export function formatRecentDomain(urlValue) {
 
     if (url.protocol === "http:" || url.protocol === "https:") {
       return url.hostname.toLowerCase().replace(/^www\./, "") ||
-        "Address unavailable";
+        createMessage("addressUnavailable");
     }
 
     if (url.protocol === "file:") {
-      return "Local file";
+      return createMessage("localFile");
     }
 
     if (url.hostname) {
       return `${url.protocol}//${url.hostname}`;
     }
 
-    return url.protocol.slice(0, -1) || "Address unavailable";
+    return url.protocol.slice(0, -1) || createMessage("addressUnavailable");
   } catch {
     return urlValue;
   }
 }
 
 export function getRecentKindLabel(kind) {
-  return kind === "window" ? "Window" : "Tab";
+  return createMessage(kind === "window" ? "windowKind" : "tabKind");
 }
 
 export function getRecentItemPresentation(item) {
-  const supportingTitles = item.representativeTitles.slice(1).join(" · ");
+  const supportingTitles = item.representativeTitles.slice(1);
 
   return {
     typeLabel: getRecentKindLabel(item.kind),
-    context: item.kind === "window" && supportingTitles
-      ? `${item.context} · ${supportingTitles}`
+    context: item.kind === "window" && supportingTitles.length > 0
+      ? createMessage("recentWindowContext", [item.context, supportingTitles])
       : item.context,
     contextTitle: item.fullContext || null,
   };
@@ -79,10 +79,10 @@ export function getRecentListState({ itemCount, notice = null }) {
   const restoredEverything = notice?.tone === "success";
 
   return {
-    title: "Nothing recently closed",
+    title: createMessage("nothingRecentlyClosed"),
     message: restoredEverything
-      ? `${notice.message} Chrome's browser-wide list is now empty.`
-      : "Close a tab or window in Chrome, then refresh this view.",
+      ? createMessage("recentListEmptyAfterRestore", [notice.message])
+      : createMessage("recentListEmpty"),
     tone: restoredEverything ? "success" : "neutral",
   };
 }
@@ -112,7 +112,7 @@ function createTabItem(tab, lastModified) {
     tabCount: 1,
     representativeTitles: [title],
     lastModified: getLastModified({ lastModified }),
-    ariaLabel: `Restore tab: ${title}, ${domain}`,
+    ariaLabel: createMessage("restoreTabLabel", [title, domain]),
   };
 }
 
@@ -120,9 +120,9 @@ function createWindowItem(window, lastModified) {
   const tabs = Array.isArray(window.tabs) ? window.tabs : [];
   const representativeTitles = getRepresentativeTitles(tabs);
   const tabCount = tabs.length;
-  const title = representativeTitles[0] || "Recently closed window";
-  const countLabel = `${tabCount} ${pluralize("tab", tabCount)}`;
-  const representativeLabel = representativeTitles.join(", ");
+  const title = representativeTitles[0] ||
+    createMessage("recentlyClosedWindow");
+  const countLabel = createPluralMessage("tabCount", tabCount);
 
   return {
     sessionId: window.sessionId,
@@ -133,9 +133,12 @@ function createWindowItem(window, lastModified) {
     tabCount,
     representativeTitles,
     lastModified: getLastModified({ lastModified }),
-    ariaLabel: representativeLabel
-      ? `Restore window with ${countLabel}: ${representativeLabel}`
-      : `Restore window with ${countLabel}`,
+    ariaLabel: representativeTitles.length > 0
+      ? createMessage("restoreWindowLabelWithTitles", [
+        countLabel,
+        representativeTitles,
+      ])
+      : createMessage("restoreWindowLabel", [countLabel]),
   };
 }
 
@@ -145,7 +148,9 @@ function getRepresentativeTitles(tabs) {
 
   for (const tab of tabs) {
     const label = getTabLabel(tab);
-    const key = label.toLocaleLowerCase();
+    const key = typeof label === "string"
+      ? label.toLocaleLowerCase()
+      : JSON.stringify(label);
 
     if (!seen.has(key)) {
       labels.push(label);
@@ -162,7 +167,8 @@ function getRepresentativeTitles(tabs) {
 
 function getTabLabel(tab) {
   const title = typeof tab?.title === "string" ? tab.title.trim() : "";
-  return title || (tab?.url ? formatRecentDomain(tab.url) : "Untitled tab");
+  return title ||
+    (tab?.url ? formatRecentDomain(tab.url) : createMessage("untitledTab"));
 }
 
 function getLastModified(session) {

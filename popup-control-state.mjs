@@ -1,15 +1,15 @@
-import { pluralize } from "./popup-format.mjs";
+import { createMessage, createPluralMessage } from "./i18n.mjs";
 
 const GROUP_ACTION_COPY = {
   group: {
-    title: "Group tabs by domain",
-    description: "Group sites with two or more tabs",
-    actionDescription: "Groups sites with two or more tabs by domain",
+    title: "groupTabs",
+    description: "groupSummary",
+    actionDescription: "groupActionDescription",
   },
   ungroup: {
-    title: "Ungroup tabs",
-    description: "Remove same-domain groups only",
-    actionDescription: "Removes groups that contain tabs from a single domain",
+    title: "ungroupTabs",
+    description: "ungroupSummary",
+    actionDescription: "ungroupActionDescription",
   },
 };
 
@@ -71,43 +71,42 @@ export function getUndoControlState(state) {
 
 function getUndoCopy(operation, summary) {
   const count = summary.count;
-  const tabs = `${count} ${pluralize("tab", count)}`;
+  const tabs = createPluralMessage("tabCount", count);
 
   switch (operation) {
     case "sort-by-domain":
       return {
-        text: `Sorted ${tabs}`,
-        ariaLabel: `Undo sorting and restore the previous order of ${tabs}`,
+        text: createMessage("undoSortText", [tabs]),
+        ariaLabel: createMessage("undoSortLabel", [tabs]),
       };
     case "group-tabs": {
       const groupCount = summary.groupCount || 0;
+      const groups = createPluralMessage("groupCount", groupCount);
       return {
-        text: `Grouped ${tabs} into ${groupCount} ${pluralize("group", groupCount)}`,
-        ariaLabel:
-          `Undo grouping and ungroup ${tabs} from ${groupCount} ${pluralize("group", groupCount)}`,
+        text: createMessage("undoGroupText", [tabs, groups]),
+        ariaLabel: createMessage("undoGroupLabel", [tabs, groups]),
       };
     }
     case "ungroup-tabs": {
       const groupCount = summary.groupCount || 0;
+      const groups = createPluralMessage("groupCount", groupCount);
       return {
-        text: `Ungrouped ${tabs} from ${groupCount} ${pluralize("group", groupCount)}`,
-        ariaLabel:
-          `Undo ungrouping and restore ${tabs} to ${groupCount} ${pluralize("group", groupCount)}`,
+        text: createMessage("undoUngroupText", [tabs, groups]),
+        ariaLabel: createMessage("undoUngroupLabel", [tabs, groups]),
       };
     }
     case "gather-tabs-here": {
       const windowCount = summary.windowCount || 0;
+      const windows = createPluralMessage("windowCount", windowCount);
       return {
-        text: `Gathered ${tabs} from ${windowCount} ${pluralize("window", windowCount)}`,
-        ariaLabel:
-          `Undo gathering and return ${tabs} to ${windowCount} ${pluralize("window", windowCount)}`,
+        text: createMessage("undoGatherText", [tabs, windows]),
+        ariaLabel: createMessage("undoGatherLabel", [tabs, windows]),
       };
     }
     default:
       return {
-        text: `Closed ${tabs}`,
-        ariaLabel:
-          `Undo the latest duplicate cleanup and restore ${tabs}`,
+        text: createPluralMessage("closedTabs", count),
+        ariaLabel: createPluralMessage("undoClosedTabs", count),
       };
   }
 }

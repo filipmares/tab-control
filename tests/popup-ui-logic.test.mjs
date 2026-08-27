@@ -7,9 +7,30 @@ import {
   getDifferenceRange,
   getHighlightedUrlSegments,
   getPopupActionShortcut,
-  getReviewGroupLabels,
-  getReviewTabPresentation,
+  getReviewGroupLabels as createReviewGroupLabels,
+  getReviewTabPresentation as createReviewTabPresentation,
 } from "../popup-ui-logic.mjs";
+import { createEnglishTranslator } from "./i18n-test-helper.mjs";
+
+const translate = createEnglishTranslator();
+const getReviewGroupLabels = (...args) => {
+  const labels = createReviewGroupLabels(...args);
+  return {
+    progress: translate(labels.progress),
+    keepAllLabel: translate(labels.keepAllLabel),
+    closeAllLabel: translate(labels.closeAllLabel),
+  };
+};
+const getReviewTabPresentation = (...args) => {
+  const presentation = createReviewTabPresentation(...args);
+  return {
+    title: typeof presentation.title === "string"
+      ? presentation.title
+      : translate(presentation.title),
+    badge: presentation.badge ? translate(presentation.badge) : null,
+    ariaLabel: translate(presentation.ariaLabel),
+  };
+};
 
 function keyboardEvent(key, overrides = {}) {
   return {

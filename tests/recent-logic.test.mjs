@@ -2,13 +2,47 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  createRecentlyClosedViewModel,
-  formatRecentDomain,
-  getRecentItemPresentation,
-  getRecentKindLabel,
-  getRecentListState,
+  createRecentlyClosedViewModel as createRecentItems,
+  formatRecentDomain as createRecentDomain,
+  getRecentItemPresentation as createRecentItemPresentation,
+  getRecentKindLabel as createRecentKindLabel,
+  getRecentListState as createRecentListState,
   RECENT_SESSION_LIMIT,
 } from "../recent-logic.mjs";
+import { createEnglishTranslator } from "./i18n-test-helper.mjs";
+
+const translate = createEnglishTranslator();
+const localize = (value) =>
+  typeof value === "string" || value === null ? value : translate(value);
+const createRecentlyClosedViewModel = (...args) =>
+  createRecentItems(...args).map((item) => ({
+    ...item,
+    title: localize(item.title),
+    context: localize(item.context),
+    representativeTitles: item.representativeTitles.map(localize),
+    ariaLabel: translate(item.ariaLabel),
+  }));
+const formatRecentDomain = (...args) => localize(createRecentDomain(...args));
+const getRecentKindLabel = (...args) =>
+  translate(createRecentKindLabel(...args));
+const getRecentItemPresentation = (...args) => {
+  const presentation = createRecentItemPresentation(...args);
+  return {
+    ...presentation,
+    typeLabel: translate(presentation.typeLabel),
+    context: localize(presentation.context),
+  };
+};
+const getRecentListState = (...args) => {
+  const result = createRecentListState(...args);
+  return result
+    ? {
+      ...result,
+      title: localize(result.title),
+      message: localize(result.message),
+    }
+    : null;
+};
 
 test("orders browser sessions newest first and limits the result", () => {
   const sessions = Array.from({ length: 12 }, (_, index) => ({
@@ -79,7 +113,7 @@ test("formats a window with its count and representative tab titles", () => {
   ]);
   assert.equal(
     item.ariaLabel,
-    "Restore window with 5 tabs: Inbox, Project board, calendar.example.com",
+    "Restore window with 5 tabs: Inbox, Project board, and calendar.example.com",
   );
 });
 
@@ -124,7 +158,7 @@ test("appends supporting window titles to the context line", () => {
 
   assert.deepEqual(presentation, {
     typeLabel: "Window",
-    context: "3 tabs · Second · Third",
+    context: "3 tabs · Second and Third",
     contextTitle: null,
   });
 });

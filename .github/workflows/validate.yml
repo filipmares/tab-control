@@ -28,6 +28,7 @@ jobs:
           node --input-type=module --check < background.js
           node --check background-logic.mjs
           node --check chrome-adapter.mjs
+          node --check i18n.mjs
           node --check popup-control-state.mjs
           node --check popup-format.mjs
           node --check popup-ui-logic.mjs
@@ -42,9 +43,11 @@ jobs:
           node - <<'NODE'
           const fs = require("node:fs");
           const manifest = JSON.parse(fs.readFileSync("manifest.json", "utf8"));
+          const localeMessages = `_locales/${manifest.default_locale}/messages.json`;
           const assets = [
             manifest.background.service_worker,
             manifest.action.default_popup,
+            localeMessages,
             ...Object.values(manifest.icons),
             ...Object.values(manifest.action.default_icon),
           ];
@@ -76,7 +79,7 @@ jobs:
           extension="tab-control-${{ steps.version.outputs.value }}"
           mkdir -p "release/$extension"
           cp manifest.json popup.html popup.css *.js *.mjs "release/$extension"
-          cp -R icons "release/$extension"
+          cp -R icons _locales "release/$extension"
           (
             cd "release/$extension"
             zip -r "../$extension.zip" .
@@ -96,6 +99,7 @@ jobs:
             popup-control-state.mjs \
             popup-format.mjs \
             popup-ui-logic.mjs \
+            i18n.mjs \
             recent-logic.mjs \
             tab-edit-retry.mjs \
             tab-logic.mjs \
@@ -103,6 +107,7 @@ jobs:
           do
             grep -Fx "$required_file" <<< "$archive_files"
           done
+          grep -Fx "_locales/en/messages.json" <<< "$archive_files"
 
       - name: Upload extension archive
         uses: actions/upload-artifact@v7
